@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Morpion Multijoueur 🎮</title>
+    <style>
+        /* Mêmes styles que précédemment */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 520px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            font-size: 2.2em;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+        }
+        #status {
+            text-align: center;
+            padding: 12px 15px;
+            margin: 10px 0 20px 0;
+            border-radius: 12px;
+            font-weight: 600;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f0f0f0;
+            border: 2px solid transparent;
+        }
+        #status.waiting { background: #fff3cd; border-color: #ffc107; color: #856404; }
+        #status.success { background: #d4edda; border-color: #28a745; color: #155724; }
+        #status.danger { background: #f8d7da; border-color: #dc3545; color: #721c24; }
+        #status.info { background: #d1ecf1; border-color: #17a2b8; color: #0c5460; }
+        .player-input {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .player-input input {
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            font-size: 1em;
+            flex: 1;
+            min-width: 150px;
+            max-width: 250px;
+        }
+        .player-input input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .btn-warning { background: linear-gradient(135deg, #f6d365, #fda085); color: white; }
+        .btn-danger { background: linear-gradient(135deg, #ff0844, #ffb199); color: white; }
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        #room-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 12px;
+            margin: 15px 0;
+            text-align: center;
+            display: none;
+            border: 2px solid #e9ecef;
+        }
+        #room-link {
+            color: #667eea;
+            cursor: pointer;
+            text-decoration: underline;
+            font-weight: 600;
+        }
+        #board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .cell {
+            aspect-ratio: 1;
+            background: #f8f9fa;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 3px solid #e9ecef;
+            user-select: none;
+            min-height: 80px;
+        }
+        .cell.x { color: #dc3545; animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .cell.o { color: #007bff; animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .cell:not(.disabled):not(.taken):hover {
+            transform: scale(1.05);
+            background: #e9ecef;
+            border-color: #667eea;
+        }
+        .cell.disabled { cursor: not-allowed; opacity: 0.7; }
+        .cell.taken { cursor: default; }
+        .cell.winner { background: #d4edda !important; border-color: #28a745 !important; animation: pulse 1s ease-in-out infinite; }
+        @keyframes popIn {
+            0% { transform: scale(0.3) rotate(-20deg); opacity: 0; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        .hide { display: none !important; }
+        .version { text-align: center; color: #999; font-size: 0.75em; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e9ecef; }
+        @media (max-width: 480px) {
+            .container { padding: 15px; }
+            .cell { font-size: 2.8em; min-height: 60px; }
+            button { padding: 10px 15px; min-width: 80px; font-size: 0.9em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Morpion</h1>
+        <p class="subtitle">Jouez en ligne avec un ami en temps réel !</p>
+
+        <div id="player-name-section">
+            <div class="player-input">
+                <input type="text" id="player-name" placeholder="Votre pseudo..." maxlength="20" value="Joueur" autofocus>
+                <button class="btn-primary" id="start-btn" onclick="joinOrCreateGame()">🚀 Commencer</button>
+            </div>
+            <p style="text-align:center; font-size:0.8em; color:#888; margin-top:5px;">
+                ou partagez un lien pour inviter un ami
+            </p>
+        </div>
+
+        <div id="status">Entrez votre pseudo et cliquez sur Commencer</div>
+
+        <div id="room-info">
+            <span class="label">🏠 Salle :</span>
+            <span id="room-id" style="font-weight:600;color:#333;"></span>
+            <span style="margin: 0 8px;">|</span>
+            <span id="room-link" onclick="copyRoomLink()">📋 Copier le lien</span>
+            <br>
+            <span style="font-size:0.8em;color:#888;">
+                👥 <span id="player-count">1</span> joueur(s) connecté(s)
+            </span>
+        </div>
+
+        <div id="board"></div>
+
+        <div class="controls">
+            <button id="reset-btn" class="btn-warning hide" onclick="resetGame()">🔄 Nouvelle partie</button>
+            <button id="quit-btn" class="btn-danger hide" onclick="quitGame()">🚪 Quitter</button>
+        </div>
+
+        <div class="version">Morpion Multijoueur v2.0</div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // ----------------------------------------------------------------
+        // CLIENT JAVASCRIPT COMPLET (identique à la version précédente)
+        // ----------------------------------------------------------------
+        
+        const socket = io();
+        let currentRoom = null;
+        let mySymbol = null;
+        let boardState = [];
+        let gameOver = false;
+        let statusTurn = null;
+        let playerName = '';
+        let opponentName = 'Adversaire';
+        let isWaiting = false;
+
+        const boardDiv = document.getElementById('board');
+        const statusDiv = document.getElementById('status');
+        const resetBtn = document.getElementById('reset-btn');
+        const quitBtn = document.getElementById('quit-btn');
+        const roomInfoDiv = document.getElementById('room-info');
+        const roomIdSpan = document.getElementById('room-id');
+        const playerCountSpan = document.getElementById('player-count');
+        const playerNameInput = document.getElementById('player-name');
+        const nameSection = document.getElementById('player-name-section');
+        const startBtn = document.getElementById('start-btn');
+
+        function updateStatus(message, type = '') {
+            statusDiv.textContent = message;
+            statusDiv.className = type;
+        }
+
+        function renderBoard(board) {
+            boardDiv.innerHTML = '';
+            for (let i = 0; i < 9; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.index = i;
+                const val = board[i];
+                if (val === 1) { cell.textContent = 'X'; cell.classList.add('x'); cell.classList.add('taken'); }
+                else if (val === 2) { cell.textContent = 'O'; cell.classList.add('o'); cell.classList.add('taken'); }
+                if (gameOver && board[i] !== 0) cell.classList.add('winner');
+                cell.addEventListener('click', () => handleCellClick(i));
+                boardDiv.appendChild(cell);
+            }
+            updateBoardStyle();
+        }
+
+        function updateBoardStyle() {
+            const cells = document.querySelectorAll('.cell');
+            const isMyTurn = (mySymbol === statusTurn) && !gameOver && currentRoom !== null && !isWaiting;
+            cells.forEach((cell, idx) => {
+                const val = boardState[idx];
+                if (val !== 0 || !isMyTurn || gameOver || isWaiting) cell.classList.add('disabled');
+                else cell.classList.remove('disabled');
+            });
+        }
+
+        function updateGameState(data) {
+            boardState = data.board;
+            statusTurn = data.turn;
+            gameOver = (data.winner !== null && data.winner !== undefined);
+            isWaiting = false;
+            renderBoard(boardState);
+            let msg = '', type = 'info';
+            if (data.winner === 'draw') { msg = '🤝 Match nul !'; type = 'warning'; gameOver = true; }
+            else if (data.winner === 'X' || data.winner === 'O') {
+                const winnerName = data.winner === mySymbol ? 'Vous' : opponentName;
+                msg = `🏆 ${winnerName} a gagné !`;
+                type = 'success';
+                gameOver = true;
+            } else {
+                if (data.turn) {
+                    const turnName = data.turn === mySymbol ? 'Vous' : opponentName;
+                    msg = `🎯 Tour de ${turnName}`;
+                    if (mySymbol === data.turn) { msg += ' 👈 (à vous de jouer)'; type = 'success'; }
+                    else type = 'info';
+                } else msg = '⏳ Partie en cours...';
+            }
+            if (gameOver) { msg += ' 🔄 Cliquez sur "Nouvelle partie" pour rejouer.'; resetBtn.classList.remove('hide'); }
+            else resetBtn.classList.add('hide');
+            updateStatus(msg, type);
+            quitBtn.classList.remove('hide');
+        }
+
+        function handleCellClick(index) {
+            if (gameOver || currentRoom === null || isWaiting) return;
+            if (boardState[index] !== 0) return;
+            if (mySymbol !== statusTurn) return;
+            socket.emit('move', { room: currentRoom, position: index });
+        }
+
+        function copyRoomLink() {
+            const url = window.location.origin + '?room=' + currentRoom;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(() => {
+                    updateStatus('✅ Lien copié dans le presse-papiers !', 'success');
+                }).catch(() => fallbackCopy(url));
+            } else fallbackCopy(url);
+        }
+
+        function fallbackCopy(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try { document.execCommand('copy'); updateStatus('✅ Lien copié !', 'success'); }
+            catch (err) { updateStatus('❌ Impossible de copier le lien', 'danger'); }
+            document.body.removeChild(textarea);
+        }
+
+        function joinOrCreateGame() {
+            playerName = playerNameInput.value.trim() || 'Joueur';
+            if (playerName.length > 20) playerName = playerName.substring(0, 20);
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomParam = urlParams.get('room');
+            if (roomParam) {
+                socket.emit('join_game', { room: roomParam, player_name: playerName });
+                updateStatus(`⏳ Rejoint la salle ${roomParam}...`, 'info');
+            } else {
+                socket.emit('join_game', { room: null, player_name: playerName });
+                updateStatus('⏳ Création d\'une nouvelle partie...', 'info');
+            }
+            nameSection.style.display = 'none';
+            startBtn.disabled = true;
+        }
+
+        function resetGame() {
+            if (currentRoom) {
+                socket.emit('reset_game', { room: currentRoom });
+                updateStatus('🔄 Réinitialisation en cours...', 'info');
+            }
+        }
+
+        function quitGame() {
+            if (currentRoom) {
+                socket.emit('leave_game', { room: currentRoom });
+                updateStatus('👋 Déconnexion en cours...', 'info');
+            }
+        }
+
+        function renderEmptyBoard() {
+            boardDiv.innerHTML = '';
+            for (let i = 0; i < 9; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell disabled';
+                cell.dataset.index = i;
+                boardDiv.appendChild(cell);
+            }
+        }
+
+        function updatePlayerCount(count) {
+            playerCountSpan.textContent = count;
+        }
+
+        // Événements Socket.IO
+        socket.on('connect', () => {
+            console.log('✅ Connecté au serveur');
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomParam = urlParams.get('room');
+            if (roomParam && playerNameInput.value) {
+                setTimeout(() => joinOrCreateGame(), 300);
+            }
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error('❌ Erreur de connexion:', error);
+            updateStatus('❌ Impossible de se connecter au serveur.', 'danger');
+            startBtn.disabled = false;
+        });
+
+        socket.on('connected', (data) => {
+            console.log('📨 Message du serveur:', data.message);
+        });
+
+        socket.on('game_start', (data) => {
+            currentRoom = data.room;
+            mySymbol = data.symbol;
+            boardState = data.board;
+            statusTurn = data.turn;
+            gameOver = false;
+            isWaiting = data.waiting || false;
+            roomIdSpan.textContent = currentRoom;
+            roomInfoDiv.style.display = 'block';
+            resetBtn.classList.add('hide');
+            quitBtn.classList.remove('hide');
+            startBtn.disabled = false;
+            updatePlayerCount(data.player_count || 1);
+            if (data.waiting) {
+                updateStatus(`⏳ En attente d'un adversaire... Partagez le lien !`, 'waiting');
+                renderEmptyBoard();
+                isWaiting = true;
+            } else {
+                opponentName = data.player_name || 'Adversaire';
+                updateGameState(data);
+            }
+            const newUrl = window.location.origin + '?room=' + currentRoom;
+            window.history.pushState({ room: currentRoom }, '', newUrl);
+        });
+
+        socket.on('game_state', (data) => {
+            updateGameState(data);
+        });
+
+        socket.on('opponent_joined', (data) => {
+            opponentName = data.player_name || 'Adversaire';
+            isWaiting = false;
+            updateStatus(`👋 ${opponentName} a rejoint la partie !`, 'success');
+            updatePlayerCount(2);
+            setTimeout(() => {
+                if (currentRoom) socket.emit('request_state', { room: currentRoom });
+            }, 300);
+        });
+
+        socket.on('opponent_left', (data) => {
+            updateStatus(`👋 ${data.message}`, 'danger');
+            boardDiv.innerHTML = '';
+            resetBtn.classList.add('hide');
+            quitBtn.classList.add('hide');
+            roomInfoDiv.style.display = 'none';
+            currentRoom = null;
+            mySymbol = null;
+            gameOver = true;
+            isWaiting = false;
+            nameSection.style.display = 'block';
+            startBtn.disabled = false;
+            updatePlayerCount(0);
+            window.history.pushState({}, '', window.location.origin);
+        });
+
+        socket.on('game_over', (data) => {
+            console.log('🏁 Partie terminée:', data.message);
+        });
+
+        socket.on('game_reset', (data) => {
+            updateStatus('🔄 Partie réinitialisée !', 'info');
+        });
+
+        socket.on('game_expired', (data) => {
+            updateStatus('⏰ La partie a expiré (inactivité)', 'danger');
+            boardDiv.innerHTML = '';
+            resetBtn.classList.add('hide');
+            quitBtn.classList.add('hide');
+            roomInfoDiv.style.display = 'none';
+            currentRoom = null;
+            mySymbol = null;
+            gameOver = true;
+            isWaiting = false;
+            nameSection.style.display = 'block';
+            startBtn.disabled = false;
+            updatePlayerCount(0);
+            window.history.pushState({}, '', window.location.origin);
+        });
+
+        socket.on('left_game', (data) => {
+            updateStatus('👋 Vous avez quitté la partie', 'info');
+            boardDiv.innerHTML = '';
+            resetBtn.classList.add('hide');
+            quitBtn.classList.add('hide');
+            roomInfoDiv.style.display = 'none';
+            currentRoom = null;
+            mySymbol = null;
+            gameOver = true;
+            isWaiting = false;
+            nameSection.style.display = 'block';
+            startBtn.disabled = false;
+            updatePlayerCount(0);
+            window.history.pushState({}, '', window.location.origin);
+        });
+
+        socket.on('personal_result', (data) => {
+            updateStatus(data.message, data.result === 'win' ? 'success' : 'danger');
+        });
+
+        socket.on('error', (data) => {
+            updateStatus(`❌ ${data.message}`, 'danger');
+            console.error('Erreur:', data.message);
+        });
+
+        socket.on('join_error', (data) => {
+            updateStatus(`❌ ${data.message}`, 'danger');
+            nameSection.style.display = 'block';
+            startBtn.disabled = false;
+        });
+
+        socket.on('pong', (data) => {
+            console.log('🏓 Pong reçu:', data.timestamp);
+        });
+
+        socket.on('player_count', (data) => {
+            updatePlayerCount(data.count);
+        });
+
+        socket.on('reconnected', (data) => {
+            if (data.room && data.room === currentRoom) {
+                updateStatus('✅ Reconnecté à la partie', 'success');
+            }
+        });
+
+        socket.on('reconnect', (attemptNumber) => {
+            console.log(`✅ Reconnecté après ${attemptNumber} tentative(s)`);
+            updateStatus('✅ Reconnecté au serveur !', 'success');
+            if (currentRoom && playerName) {
+                setTimeout(() => {
+                    socket.emit('join_game', { room: currentRoom, player_name: playerName });
+                }, 500);
+            }
+        });
+
+        socket.on('disconnect', () => {
+            console.warn('⚠️ Déconnecté du serveur');
+            updateStatus('❌ Déconnecté du serveur. Reconnexion en cours...', 'danger');
+        });
+
+        // Ping pour maintenir la connexion
+        setInterval(() => {
+            if (socket.connected) socket.emit('ping');
+        }, 20000);
+
+        // Initialisation
+        playerNameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); joinOrCreateGame(); }
+        });
+        playerNameInput.focus();
+
+        const initialUrlParams = new URLSearchParams(window.location.search);
+        const initialRoom = initialUrlParams.get('room');
+        if (initialRoom) {
+            updateStatus(`🔗 Lien de partie détecté : salle ${initialRoom}. Entrez votre pseudo.`, 'info');
+        }
+
+        if (socket.connected && initialRoom && playerNameInput.value) {
+            setTimeout(() => joinOrCreateGame(), 200);
+        }
+
+        window.joinOrCreateGame = joinOrCreateGame;
+        window.resetGame = resetGame;
+        window.quitGame = quitGame;
+        window.copyRoomLink = copyRoomLink;
+
+        console.log('🎮 Morpion Multijoueur - Client prêt !');
+    </script>
+</body>
+</html>
