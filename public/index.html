@@ -148,13 +148,14 @@
         .btn-danger { background: linear-gradient(135deg, #ff0844, #ffb199); color: white; }
         .controls {
             position: relative;
-            z-index: 3; /* s'assurer que les boutons apparaissent au-dessus */
+            z-index: 10002; /* s'assurer que les boutons apparaissent au-dessus */
             display: flex;
             gap: 10px;
             justify-content: center;
             flex-wrap: wrap;
             margin-top: 20px;
         }
+        .controls button { position: relative; z-index: 10003; }
         #room-info {
             background: #f8f9fa;
             padding: 15px;
@@ -469,6 +470,17 @@
             });
         }
 
+        function ensureControlsVisible() {
+            // Si on est dans une partie active, forcer l'affichage des boutons
+            try {
+                if (currentRoom && !isWaiting) {
+                    if (quitBtn && quitBtn.classList.contains('hide')) quitBtn.classList.remove('hide');
+                    // resetBtn visible seulement si gameOver
+                    if (resetBtn && gameOver && resetBtn.classList.contains('hide')) resetBtn.classList.remove('hide');
+                }
+            } catch (e) { console.warn('ensureControlsVisible error', e); }
+        }
+
         function updateGameState(data) {
             boardState = data.board;
             statusTurn = data.turn;
@@ -513,6 +525,9 @@
                 document.getElementById('scoreboard').classList.remove('hide');
                 document.getElementById('reaction-panel').classList.remove('hide');
             }
+
+            // Sécurité : forcer l'affichage des contrôles après mise à jour
+            ensureControlsVisible();
         }
 
         function updateScoreboard(scores) {
