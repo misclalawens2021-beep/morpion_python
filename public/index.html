@@ -22,23 +22,47 @@
             overflow: hidden; /* empêche le fond animé de provoquer des barres de scroll */
         }
 
-        /* Élément de fond animé, non interactif et derrière le contenu */
+        /* Élément de fond évoquant le jeu (grille + X/O subtils) */
         #bg-animated {
             position: fixed;
             inset: 0;
             z-index: 0;
             pointer-events: none;
-            background-image: radial-gradient(circle at 10% 20%, rgba(255,255,255,0.06), transparent 8%), radial-gradient(circle at 80% 80%, rgba(255,255,255,0.04), transparent 12%), linear-gradient(135deg, rgba(102,126,234,0.08), rgba(118,75,162,0.08));
+            background-color: transparent;
+            background-image:
+              url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'>\
+<rect width='100%' height='100%' fill='none'/>\
+<g stroke='%23ffffff' stroke-opacity='0.12' stroke-width='12' stroke-linecap='round'>\
+<line x1='100' y1='15' x2='100' y2='285'/>\
+<line x1='200' y1='15' x2='200' y2='285'/>\
+<line x1='15' y1='100' x2='285' y2='100'/>\
+<line x1='15' y1='200' x2='285' y2='200'/>\
+</g>\
+<g stroke='%23ffffff' stroke-opacity='0.08' stroke-width='10' stroke-linecap='round'>\
+<line x1='35' y1='35' x2='65' y2='65'/>\
+<line x1='35' y1='65' x2='65' y2='35'/>\
+<circle cx='150' cy='150' r='28' fill='none'/>\
+<line x1='235' y1='235' x2='265' y2='265'/>\
+<line x1='235' y1='265' x2='265' y2='235'/>\
+</g>\
+</svg>"),
+              radial-gradient(circle at 10% 20%, rgba(255,255,255,0.03), transparent 8%),
+              radial-gradient(circle at 80% 80%, rgba(255,255,255,0.02), transparent 12%),
+              linear-gradient(135deg, rgba(102,126,234,0.06), rgba(118,75,162,0.06));
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 56vmin;
             mix-blend-mode: overlay;
-            filter: blur(40px);
+            opacity: 0.9;
+            filter: blur(16px) saturate(1.05);
             transform: translateZ(0);
-            animation: bgMove 20s linear infinite;
+            animation: bgFloat 28s ease-in-out infinite;
         }
 
-        @keyframes bgMove {
-            0% { transform: translate(-4%, -4%) scale(1); }
-            50% { transform: translate(4%, 4%) scale(1.03); }
-            100% { transform: translate(-4%, -4%) scale(1); }
+        @keyframes bgFloat {
+            0% { transform: translate(-3%, -3%) rotate(-1deg) scale(1); }
+            50% { transform: translate(3%, 3%) rotate(1deg) scale(1.02); }
+            100% { transform: translate(-3%, -3%) rotate(-1deg) scale(1); }
         }
 
         .container {
