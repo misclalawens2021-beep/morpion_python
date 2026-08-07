@@ -213,10 +213,125 @@
         .hide { display: none !important; }
         .version { text-align: center; color: #999; font-size: 0.75em; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e9ecef; }
 
+        /* Styles additionnels - Scoreboard */
+        #scoreboard {
+            display: flex;
+            justify-content: space-around;
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 10px 15px;
+            margin: 15px 0;
+            border: 2px solid #e9ecef;
+            gap: 10px;
+        }
+        .score-player {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            font-size: 0.9em;
+            font-weight: 600;
+            color: #555;
+            text-align: center;
+        }
+        .score-badge {
+            background: #e9ecef;
+            color: #333;
+            border-radius: 20px;
+            padding: 2px 12px;
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-top: 4px;
+            min-width: 30px;
+            text-align: center;
+        }
+        .score-x .score-badge { background: #fde8eb; color: #dc3545; }
+        .score-o .score-badge { background: #e8f4fd; color: #007bff; }
+        .score-draw .score-badge { background: #fffdf5; color: #ffc107; }
+
+        /* Styles additionnels - Reaction Panel */
+        #reaction-panel {
+            margin-top: 15px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+            padding-top: 15px;
+        }
+        .reaction-title {
+            font-size: 0.85em;
+            color: #777;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .reaction-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .btn-react {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            padding: 8px;
+            font-size: 1.4em;
+            cursor: pointer;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            min-width: unset;
+        }
+        .btn-react:hover {
+            transform: scale(1.2) rotate(10deg);
+            background: #fff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        /* Styles additionnels - Toasts */
+        #reaction-toast-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+        }
+        .reaction-toast {
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid #667eea;
+            color: #333;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-weight: 600;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1.1em;
+            animation: slideDownIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), fadeOutUp 0.3s ease-in 2.5s forwards;
+            pointer-events: none;
+        }
+        @keyframes slideDownIn {
+            0% { transform: translateY(-50px) scale(0.8); opacity: 0; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        @keyframes fadeOutUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-30px) scale(0.8); opacity: 0; }
+        }
+
         /* Respecter la préférence de réduction d'animations */
         @media (prefers-reduced-motion: reduce) {
             #bg-animated { animation: none; filter: none; }
             .cell.x, .cell.o, .cell.winner { animation: none; }
+            .reaction-toast { animation: none; opacity: 0.9; }
         }
 
         @media (max-width: 480px) {
@@ -227,6 +342,7 @@
     </style>
 </head>
 <body>
+    <div id="reaction-toast-container"></div>
     <div id="bg-animated" aria-hidden="true"></div>
     <div class="container">
         <h1>🎮 Morpion</h1>
@@ -244,6 +360,21 @@
 
         <div id="status">Entrez votre pseudo et cliquez sur Commencer</div>
 
+        <div id="scoreboard" class="hide">
+            <div class="score-player score-x">
+                <span id="score-name-x">Joueur X</span>
+                <span id="score-val-x" class="score-badge">0</span>
+            </div>
+            <div class="score-player score-draw">
+                <span>Nuls</span>
+                <span id="score-val-draw" class="score-badge">0</span>
+            </div>
+            <div class="score-player score-o">
+                <span id="score-name-o">Joueur O</span>
+                <span id="score-val-o" class="score-badge">0</span>
+            </div>
+        </div>
+
         <div id="room-info">
             <span class="label">🏠 Salle :</span>
             <span id="room-id" style="font-weight:600;color:#333;"></span>
@@ -260,6 +391,18 @@
         <div class="controls">
             <button id="reset-btn" class="btn-warning hide" onclick="resetGame()">🔄 Nouvelle partie</button>
             <button id="quit-btn" class="btn-danger hide" onclick="quitGame()">🚪 Quitter</button>
+        </div>
+
+        <div id="reaction-panel" class="hide">
+            <span class="reaction-title">Envoyer une réaction :</span>
+            <div class="reaction-buttons">
+                <button class="btn-react" onclick="sendReaction('😂')">😂</button>
+                <button class="btn-react" onclick="sendReaction('😢')">😢</button>
+                <button class="btn-react" onclick="sendReaction('😮')">😮</button>
+                <button class="btn-react" onclick="sendReaction('🔥')">🔥</button>
+                <button class="btn-react" onclick="sendReaction('👍')">👍</button>
+                <button class="btn-react" onclick="sendReaction('👑')">👑</button>
+            </div>
         </div>
 
         <div class="version">Morpion Multijoueur v2.0</div>
@@ -293,7 +436,7 @@
             statusDiv.className = type;
         }
 
-        function renderBoard(board) {
+        function renderBoard(board, winningCombo = null) {
             boardDiv.innerHTML = '';
             for (let i = 0; i < 9; i++) {
                 const cell = document.createElement('div');
@@ -302,7 +445,12 @@
                 const val = board[i];
                 if (val === 1) { cell.textContent = 'X'; cell.classList.add('x'); cell.classList.add('taken'); }
                 else if (val === 2) { cell.textContent = 'O'; cell.classList.add('o'); cell.classList.add('taken'); }
-                if (gameOver && board[i] !== 0) cell.classList.add('winner');
+                
+                // Mettre en surbrillance verte uniquement la combinaison gagnante
+                if (winningCombo && winningCombo.includes(i)) {
+                    cell.classList.add('winner');
+                }
+                
                 cell.addEventListener('click', () => handleCellClick(i));
                 boardDiv.appendChild(cell);
             }
@@ -323,8 +471,15 @@
             boardState = data.board;
             statusTurn = data.turn;
             gameOver = (data.winner !== null && data.winner !== undefined);
-            isWaiting = false;
-            renderBoard(boardState);
+            
+            // Rendre la grille avec les cases gagnantes en surbrillance si présentes
+            renderBoard(boardState, data.winningCombo);
+            
+            // Mettre à jour le tableau des scores
+            if (data.scores) {
+                updateScoreboard(data.scores);
+            }
+            
             let msg = '', type = 'info';
             if (data.winner === 'draw') { msg = '🤝 Match nul !'; type = 'warning'; gameOver = true; }
             else if (data.winner === 'X' || data.winner === 'O') {
@@ -340,10 +495,61 @@
                     else type = 'info';
                 } else msg = '⏳ Partie en cours...';
             }
-            if (gameOver) { msg += ' 🔄 Cliquez sur "Nouvelle partie" pour rejouer.'; resetBtn.classList.remove('hide'); }
-            else resetBtn.classList.add('hide');
+            
+            if (gameOver) { 
+                msg += ' 🔄 Cliquez sur "Nouvelle partie" pour rejouer.'; 
+                resetBtn.classList.remove('hide'); 
+            } else {
+                resetBtn.classList.add('hide');
+            }
+            
             updateStatus(msg, type);
             quitBtn.classList.remove('hide');
+            
+            // Afficher le scoreboard et les réactions si la partie est active et que l'on n'attend pas d'adversaire
+            if (currentRoom && !isWaiting) {
+                document.getElementById('scoreboard').classList.remove('hide');
+                document.getElementById('reaction-panel').classList.remove('hide');
+            }
+        }
+
+        function updateScoreboard(scores) {
+            if (!scores) return;
+            document.getElementById('scoreboard').classList.remove('hide');
+            
+            const nameX = mySymbol === 'X' ? playerName : (opponentName || 'Adversaire X');
+            const nameO = mySymbol === 'O' ? playerName : (opponentName || 'Adversaire O');
+            
+            document.getElementById('score-name-x').textContent = nameX;
+            document.getElementById('score-name-o').textContent = nameO;
+            
+            document.getElementById('score-val-x').textContent = scores.X;
+            document.getElementById('score-val-o').textContent = scores.O;
+            document.getElementById('score-val-draw').textContent = scores.draws;
+        }
+
+        function sendReaction(emoji) {
+            if (currentRoom) {
+                socket.emit('reaction', { room: currentRoom, emoji: emoji });
+                showReaction(playerName, emoji, true);
+            }
+        }
+
+        function showReaction(senderName, emoji, isSelf) {
+            const container = document.getElementById('reaction-toast-container');
+            if (!container) return;
+            
+            const toast = document.createElement('div');
+            toast.className = 'reaction-toast';
+            if (isSelf) {
+                toast.style.borderColor = '#28a745';
+            }
+            toast.innerHTML = `<span style="font-size: 1.4em;">${emoji}</span> <span>${isSelf ? 'Vous' : senderName} : ${emoji}</span>`;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
         }
 
         function handleCellClick(index) {
@@ -427,7 +633,6 @@
         // Événements Socket.IO
         socket.on('connect', () => {
             console.log('✅ Connecté au serveur');
-            // La connexion automatique a été retirée pour imposer la saisie manuelle du pseudo
         });
 
         socket.on('connect_error', (error) => {
@@ -453,12 +658,17 @@
             quitBtn.classList.remove('hide');
             startBtn.disabled = false;
             updatePlayerCount(data.player_count || 1);
+            
             if (data.waiting) {
                 updateStatus(`⏳ En attente d'un adversaire... Partagez le lien !`, 'waiting');
                 renderEmptyBoard();
                 isWaiting = true;
+                document.getElementById('scoreboard').classList.add('hide');
+                document.getElementById('reaction-panel').classList.add('hide');
             } else {
-                opponentName = data.player_name || 'Adversaire';
+                opponentName = data.opponent_name || 'Adversaire';
+                document.getElementById('scoreboard').classList.remove('hide');
+                document.getElementById('reaction-panel').classList.remove('hide');
                 updateGameState(data);
             }
             const newUrl = window.location.origin + '?room=' + currentRoom;
@@ -474,6 +684,8 @@
             isWaiting = false;
             updateStatus(`👋 ${opponentName} a rejoint la partie !`, 'success');
             updatePlayerCount(2);
+            document.getElementById('scoreboard').classList.remove('hide');
+            document.getElementById('reaction-panel').classList.remove('hide');
             setTimeout(() => {
                 if (currentRoom) socket.emit('request_state', { room: currentRoom });
             }, 300);
@@ -485,6 +697,8 @@
             resetBtn.classList.add('hide');
             quitBtn.classList.add('hide');
             roomInfoDiv.style.display = 'none';
+            document.getElementById('scoreboard').classList.add('hide');
+            document.getElementById('reaction-panel').classList.add('hide');
             currentRoom = null;
             mySymbol = null;
             gameOver = true;
@@ -493,6 +707,22 @@
             startBtn.disabled = false;
             updatePlayerCount(0);
             window.history.pushState({}, '', window.location.origin);
+        });
+
+        socket.on('opponent_disconnected', (data) => {
+            updateStatus(`⏳ ${data.player_name} s'est déconnecté. Délai de grâce de ${data.grace_period}s en cours...`, 'danger');
+            isWaiting = true;
+            updateBoardStyle();
+        });
+
+        socket.on('opponent_reconnected', (data) => {
+            updateStatus(`🔌 ${data.player_name} s'est reconnecté !`, 'success');
+            isWaiting = false;
+            updateBoardStyle();
+        });
+
+        socket.on('opponent_reaction', (data) => {
+            showReaction(data.player_name, data.emoji, false);
         });
 
         socket.on('game_over', (data) => {
@@ -509,6 +739,8 @@
             resetBtn.classList.add('hide');
             quitBtn.classList.add('hide');
             roomInfoDiv.style.display = 'none';
+            document.getElementById('scoreboard').classList.add('hide');
+            document.getElementById('reaction-panel').classList.add('hide');
             currentRoom = null;
             mySymbol = null;
             gameOver = true;
@@ -525,6 +757,8 @@
             resetBtn.classList.add('hide');
             quitBtn.classList.add('hide');
             roomInfoDiv.style.display = 'none';
+            document.getElementById('scoreboard').classList.add('hide');
+            document.getElementById('reaction-panel').classList.add('hide');
             currentRoom = null;
             mySymbol = null;
             gameOver = true;
@@ -600,6 +834,7 @@
         window.resetGame = resetGame;
         window.quitGame = quitGame;
         window.copyRoomLink = copyRoomLink;
+        window.sendReaction = sendReaction;
 
         console.log('🎮 Morpion Multijoueur - Client prêt !');
     </script>

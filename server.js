@@ -49,6 +49,10 @@ const games = {};
 //   'board': [0,0,0,0,0,0,0,0,0],
 //   'turn': 'X',
 //   'winner': null,
+//   'winningCombo': null,
+//   'scores': { 'X': 0, 'O': 0, 'draws': 0 },
+//   'disconnected': { 'X': false, 'O': false },
+//   'timeouts': { 'X': timer, 'O': timer },
 //   'createdAt': timestamp,
 //   'lastMove': timestamp
 // }
@@ -59,6 +63,7 @@ const games = {};
 
 /**
  * Vérifie s'il y a un gagnant ou un match nul.
+ * Retourne un objet { winner, combo } ou null.
  */
 function checkWinner(board) {
     const wins = [
@@ -70,12 +75,12 @@ function checkWinner(board) {
     for (const combo of wins) {
         const [a, b, c] = combo;
         if (board[a] !== 0 && board[a] === board[b] && board[b] === board[c]) {
-            return board[a] === 1 ? 'X' : 'O';
+            return { winner: board[a] === 1 ? 'X' : 'O', combo };
         }
     }
     
     if (board.every(cell => cell !== 0)) {
-        return 'draw';
+        return { winner: 'draw', combo: null };
     }
     
     return null;
@@ -135,17 +140,82 @@ io.on('connection', (socket) => {
         const playerName = data.player_name || 'Joueur';
         let game = null;
         let isNewGame = false;
+        let activeRoomId = roomId;
 
         // Si un roomId est fourni, essayer de rejoindre cette salle
         if (roomId && games[roomId]) {
             game = games[roomId];
-            
-            // Vérifier si la partie est pleine
-            if (Object.keys(game.players).length >= 2) {
+
+            // Vérifier s'il s'agit d'une reconnexion d'un joueur déconnecté
+            let reconnectSymbol = null;
+            if (game.disconnected) {
+                for (const [symbol, isDisc] of Object.entries(game.disconnected)) {
+                    if (isDisc && game.playersNames[symbol] === playerName) {
+                        reconnectSymbol = symbol;
+                        break;
+                    }
+                }
+            }
+
+            if (reconnectSymbol) {
+                // Annuler le timeout de déconnexion
+                if (game.timeouts && game.timeouts[reconnectSymbol]) {
+                    clearTimeout(game.timeouts[reconnectSymbol]);
+                    delete game.timeouts[reconnectSymbol];
+                }
+                delete game.disconnected[reconnectSymbol];
+
+                // Mettre à jour le socket ID et joindre la salle
+                game.players[reconnectSymbol] = socket.id;
+                socket.join(roomId);
+
+                // Trouver l'adversaire
+                const otherSymbol = reconnectSymbol === 'X' ? 'O' : 'X';
+                const opponentName = game.playersNames[otherSymbol] || 'Adversaire';
+
+                // Renvoyer l'état d'accueil au joueur reconnecté
+                socket.emit('game_start', {
+                    room: roomId,
+                    board: game.board,
+                    turn: game.turn,
+                    symbol: reconnectSymbol,
+                    waiting: false,
+                    player_name: playerName,
+                    opponent_name: opponentName,
+                    player_count: Object.keys(game.players).length,
+                    scores: game.scores
+                });
+
+                // Informer l'autre joueur de la reconnexion
+                const otherSocketId = game.players[otherSymbol];
+                const otherSocket = io.sockets.sockets.get(otherSocketId);
+                if (otherSocket) {
+                    otherSocket.emit('opponent_reconnected', {
+                        player_name: playerName
+                    });
+                }
+
+                // Renvoyer l'état actuel de la partie
+                const state = {
+                    board: game.board,
+                    turn: game.turn,
+                    winner: game.winner,
+                    winningCombo: game.winningCombo,
+                    scores: game.scores
+                };
+                io.to(roomId).emit('game_state', state);
+
+                console.log(`🔌 Joueur ${playerName} (${reconnectSymbol}) reconnecté à la partie ${roomId}`);
+                return;
+            }
+
+            // Vérifier si la partie est pleine (en excluant les déconnectés éventuels qui n'ont pas encore expiré)
+            const activePlayersCount = Object.keys(game.players).filter(symbol => !game.disconnected || !game.disconnected[symbol]).length;
+            if (activePlayersCount >= 2) {
                 socket.emit('join_error', { message: 'Cette partie est déjà pleine !' });
                 return;
             }
-            
+
             // Vérifier si le joueur est déjà dans la partie
             if (Object.values(game.players).includes(socket.id)) {
                 socket.emit('join_error', { message: 'Vous êtes déjà dans cette partie !' });
@@ -153,81 +223,94 @@ io.on('connection', (socket) => {
             }
         } else {
             // Créer une nouvelle partie
-            const newRoomId = generateRoomId();
+            activeRoomId = generateRoomId();
             game = {
                 players: {},
                 playersNames: {},
                 board: [0, 0, 0, 0, 0, 0, 0, 0, 0],
                 turn: 'X',
                 winner: null,
+                winningCombo: null,
+                scores: { 'X': 0, 'O': 0, 'draws': 0 },
+                disconnected: {},
+                timeouts: {},
                 createdAt: Date.now(),
                 lastMove: Date.now()
             };
-            games[newRoomId] = game;
+            games[activeRoomId] = game;
             isNewGame = true;
-            
+
             // Répondre avec le nouveau roomId
             socket.emit('room_created', {
-                room: newRoomId,
-                url: `${getBaseUrl(socket)}?room=${newRoomId}`
+                room: activeRoomId,
+                url: `${getBaseUrl(socket)}?room=${activeRoomId}`
             });
-            
-            console.log(`🎮 Nouvelle partie créée : ${newRoomId} par ${socket.id}`);
+
+            console.log(`🎮 Nouvelle partie créée : ${activeRoomId} par ${socket.id}`);
         }
 
         // Déterminer le symbole du joueur
-        const symbol = Object.keys(game.players).length === 0 ? 'X' : 'O';
-        
+        let symbol = 'X';
+        if (game.players['X']) {
+            symbol = 'O';
+        }
+
         // Ajouter le joueur à la partie
         game.players[symbol] = socket.id;
         game.playersNames[symbol] = playerName;
         game.lastMove = Date.now();
 
         // Rejoindre la room Socket.IO
-        socket.join(roomId || Object.keys(games).find(key => games[key] === game));
+        socket.join(activeRoomId);
 
         // Envoyer le start au joueur
         const isWaiting = Object.keys(game.players).length < 2;
+        const opponentSymbol = symbol === 'X' ? 'O' : 'X';
+        const opponentName = game.playersNames[opponentSymbol] || null;
+
         socket.emit('game_start', {
-            room: Object.keys(games).find(key => games[key] === game),
+            room: activeRoomId,
             board: game.board,
             turn: game.turn,
             symbol: symbol,
             waiting: isWaiting,
             player_name: playerName,
-            player_count: Object.keys(game.players).length
+            opponent_name: opponentName,
+            player_count: Object.keys(game.players).length,
+            scores: game.scores
         });
 
         // Si la partie est complète, informer les deux joueurs
         if (!isWaiting) {
             // Informer l'autre joueur que l'adversaire a rejoint
-            const otherSymbol = symbol === 'X' ? 'O' : 'X';
-            const otherSocketId = game.players[otherSymbol];
+            const otherSocketId = game.players[opponentSymbol];
             const otherSocket = io.sockets.sockets.get(otherSocketId);
-            
+
             if (otherSocket) {
                 otherSocket.emit('opponent_joined', {
                     player_name: playerName,
-                    room: Object.keys(games).find(key => games[key] === game)
+                    room: activeRoomId
                 });
-                
+
                 // Envoyer l'état complet aux deux joueurs
                 const state = {
                     board: game.board,
                     turn: game.turn,
-                    winner: game.winner
+                    winner: game.winner,
+                    winningCombo: game.winningCombo,
+                    scores: game.scores
                 };
-                
-                io.to(Object.keys(games).find(key => games[key] === game)).emit('game_state', state);
+
+                io.to(activeRoomId).emit('game_state', state);
             }
-            
+
             // Envoyer le nombre de joueurs
-            io.to(Object.keys(games).find(key => games[key] === game)).emit('player_count', {
+            io.to(activeRoomId).emit('player_count', {
                 count: 2
             });
         }
 
-        console.log(`✅ Joueur ${socket.id} (${playerName}) rejoint la partie ${Object.keys(games).find(key => games[key] === game)} en tant que ${symbol}`);
+        console.log(`✅ Joueur ${socket.id} (${playerName}) rejoint la partie ${activeRoomId} en tant que ${symbol}`);
     });
 
     // ------------------------------------------------------------
@@ -241,7 +324,9 @@ io.on('connection', (socket) => {
         socket.emit('game_state', {
             board: game.board,
             turn: game.turn,
-            winner: game.winner
+            winner: game.winner,
+            winningCombo: game.winningCombo,
+            scores: game.scores
         });
     });
 
@@ -302,10 +387,18 @@ io.on('connection', (socket) => {
         game.lastMove = Date.now();
         
         // Vérifier l'état de la partie
-        const winner = checkWinner(game.board);
-        if (winner) {
-            game.winner = winner;
+        const checkResult = checkWinner(game.board);
+        if (checkResult) {
+            game.winner = checkResult.winner;
+            game.winningCombo = checkResult.combo;
             game.turn = null;
+            
+            // Mettre à jour le scoreboard
+            if (game.winner === 'draw') {
+                game.scores.draws++;
+            } else {
+                game.scores[game.winner]++;
+            }
         } else {
             game.turn = game.turn === 'X' ? 'O' : 'X';
         }
@@ -314,22 +407,24 @@ io.on('connection', (socket) => {
         const state = {
             board: game.board,
             turn: game.turn,
-            winner: game.winner
+            winner: game.winner,
+            winningCombo: game.winningCombo,
+            scores: game.scores
         };
         
         io.to(roomId).emit('game_state', state);
         
         // Si la partie est terminée, envoyer un message spécial
-        if (winner) {
-            const message = winner === 'draw' ? 'Match nul !' : `Le joueur ${winner} a gagné !`;
+        if (game.winner) {
+            const message = game.winner === 'draw' ? 'Match nul !' : `Le joueur ${game.winner} a gagné !`;
             io.to(roomId).emit('game_over', {
-                winner: winner,
+                winner: game.winner,
                 message: message
             });
             
             // Récupérer les noms des joueurs
-            const winnerName = winner !== 'draw' ? game.playersNames[winner] : null;
-            const loserSymbol = winner === 'X' ? 'O' : 'X';
+            const winnerName = game.winner !== 'draw' ? game.playersNames[game.winner] : null;
+            const loserSymbol = game.winner === 'X' ? 'O' : 'X';
             const loserName = game.playersNames[loserSymbol];
             
             if (winnerName) {
@@ -337,7 +432,7 @@ io.on('connection', (socket) => {
                 for (const [symbol, sid] of Object.entries(game.players)) {
                     const playerSocket = io.sockets.sockets.get(sid);
                     if (playerSocket) {
-                        if (symbol === winner) {
+                        if (symbol === game.winner) {
                             playerSocket.emit('personal_result', {
                                 result: 'win',
                                 message: `🎉 Vous avez gagné !`
@@ -374,17 +469,20 @@ io.on('connection', (socket) => {
             return;
         }
         
-        // Réinitialiser le jeu
+        // Réinitialiser le jeu (en conservant les scores)
         game.board = [0, 0, 0, 0, 0, 0, 0, 0, 0];
         game.turn = 'X';
         game.winner = null;
+        game.winningCombo = null;
         game.lastMove = Date.now();
         
-        // Diffuser la réinitialisation
+        // Diffuser la réinitialisation avec le scoreboard
         io.to(roomId).emit('game_state', {
             board: game.board,
             turn: game.turn,
-            winner: null
+            winner: null,
+            winningCombo: null,
+            scores: game.scores
         });
         
         io.to(roomId).emit('game_reset', { message: 'La partie a été réinitialisée' });
@@ -398,6 +496,32 @@ io.on('connection', (socket) => {
     socket.on('leave_game', (data) => {
         const roomId = data.room;
         handlePlayerLeave(socket, roomId);
+    });
+
+    // ------------------------------------------------------------
+    // ÉVÉNEMENT : Réaction / Émoticône rapide
+    // ------------------------------------------------------------
+    socket.on('reaction', (data) => {
+        const roomId = data.room;
+        const emoji = data.emoji;
+        if (!roomId || !emoji || !games[roomId]) return;
+        
+        const game = games[roomId];
+        let senderSymbol = null;
+        for (const [symbol, sid] of Object.entries(game.players)) {
+            if (sid === socket.id) {
+                senderSymbol = symbol;
+                break;
+            }
+        }
+        if (!senderSymbol) return;
+        const senderName = game.playersNames[senderSymbol];
+        
+        // Relayer la réaction à l'adversaire
+        socket.to(roomId).emit('opponent_reaction', {
+            player_name: senderName,
+            emoji: emoji
+        });
     });
 
     // ------------------------------------------------------------
@@ -424,14 +548,72 @@ io.on('connection', (socket) => {
             }
             
             if (playerSymbol) {
-                handlePlayerLeave(socket, roomId, true);
+                // S'ils s'étaient déjà déconnectés ou s'ils se déconnectent temporairement
+                handlePlayerDisconnectGrace(socket, roomId, playerSymbol);
                 break;
             }
         }
     });
 
     /**
-     * Gère le départ d'un joueur d'une partie.
+     * Gère la déconnexion temporaire d'un joueur (délai de grâce).
+     */
+    function handlePlayerDisconnectGrace(socket, roomId, playerSymbol) {
+        if (!roomId || !games[roomId]) return;
+        
+        const game = games[roomId];
+        game.disconnected = game.disconnected || {};
+        game.disconnected[playerSymbol] = true;
+        
+        // Trouver l'autre joueur
+        const otherSymbol = playerSymbol === 'X' ? 'O' : 'X';
+        const otherSocketId = game.players[otherSymbol];
+        const otherSocket = io.sockets.sockets.get(otherSocketId);
+        
+        if (otherSocket) {
+            otherSocket.emit('opponent_disconnected', {
+                player_name: game.playersNames[playerSymbol],
+                symbol: playerSymbol,
+                grace_period: 30
+            });
+        }
+        
+        // Déclencher un timeout de 30 secondes pour une déconnexion définitive
+        game.timeouts = game.timeouts || {};
+        if (game.timeouts[playerSymbol]) {
+            clearTimeout(game.timeouts[playerSymbol]);
+        }
+        
+        game.timeouts[playerSymbol] = setTimeout(() => {
+            console.log(`⏰ Délai de grâce expiré pour ${game.playersNames[playerSymbol]} (${playerSymbol}) dans la salle ${roomId}`);
+            
+            // Retirer définitivement le joueur
+            delete game.players[playerSymbol];
+            delete game.playersNames[playerSymbol];
+            if (game.disconnected) delete game.disconnected[playerSymbol];
+            if (game.timeouts) delete game.timeouts[playerSymbol];
+            
+            // Informer l'autre joueur que son opposant a définitivement quitté
+            if (otherSocket) {
+                otherSocket.emit('opponent_left', {
+                    room: roomId,
+                    message: `Le joueur ${playerSymbol} s'est déconnecté définitivement`
+                });
+                otherSocket.emit('player_count', { count: 1 });
+            } else {
+                // Plus aucun joueur actif ou connecté, supprimer la partie
+                if (Object.keys(game.players).length === 0) {
+                    delete games[roomId];
+                    console.log(`🗑️ Partie ${roomId} supprimée (aucun joueur restant après expiration)`);
+                }
+            }
+        }, 30 * 1000);
+        
+        console.log(`⏳ Joueur ${game.playersNames[playerSymbol]} (${playerSymbol}) déconnecté de la salle ${roomId}. Délai de grâce de 30s démarré.`);
+    }
+
+    /**
+     * Gère le départ d'un joueur d'une partie (clic sur Quitter).
      */
     function handlePlayerLeave(socket, roomId, isDisconnect = false) {
         if (!roomId || !games[roomId]) return;
@@ -449,9 +631,14 @@ io.on('connection', (socket) => {
         
         if (!playerSymbol) return;
         
-        // Retirer le joueur
+        // Retirer le joueur et nettoyer ses timers de reconnexion
         delete game.players[playerSymbol];
         delete game.playersNames[playerSymbol];
+        if (game.disconnected) delete game.disconnected[playerSymbol];
+        if (game.timeouts && game.timeouts[playerSymbol]) {
+            clearTimeout(game.timeouts[playerSymbol]);
+            delete game.timeouts[playerSymbol];
+        }
         
         // Quitter la room
         socket.leave(roomId);
@@ -523,3 +710,8 @@ process.on('SIGINT', () => {
     console.log('\n👋 Arrêt du serveur...');
     process.exit(0);
 });
+
+// Exports pour les tests unitaires
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { checkWinner };
+}
