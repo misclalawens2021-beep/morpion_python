@@ -53,8 +53,8 @@
             background-position: center;
             background-size: 56vmin;
             mix-blend-mode: overlay;
-            opacity: 0.9;
-            filter: blur(16px) saturate(1.05);
+            opacity: 0.65;
+            filter: blur(12px) saturate(1.02);
             transform: translateZ(0);
             animation: bgFloat 28s ease-in-out infinite;
         }
@@ -67,7 +67,7 @@
 
         .container {
             position: relative; /* permet de rester au-dessus du fond animé */
-            z-index: 1;
+            z-index: 2; /* augmenté pour garantir visibilité */
             background: rgba(255,255,255,0.95);
             border-radius: 20px;
             padding: 30px;
@@ -147,6 +147,8 @@
         .btn-warning { background: linear-gradient(135deg, #f6d365, #fda085); color: white; }
         .btn-danger { background: linear-gradient(135deg, #ff0844, #ffb199); color: white; }
         .controls {
+            position: relative;
+            z-index: 3; /* s'assurer que les boutons apparaissent au-dessus */
             display: flex;
             gap: 10px;
             justify-content: center;
