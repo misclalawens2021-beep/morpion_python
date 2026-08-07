@@ -178,7 +178,7 @@
 
         <div id="player-name-section">
             <div class="player-input">
-                <input type="text" id="player-name" placeholder="Votre pseudo..." maxlength="20" value="Joueur" autofocus>
+                <input type="text" id="player-name" placeholder="Votre pseudo..." maxlength="20" autofocus>
                 <button class="btn-primary" id="start-btn" onclick="joinOrCreateGame()">🚀 Commencer</button>
             </div>
             <p style="text-align:center; font-size:0.8em; color:#888; margin-top:5px;">
@@ -211,10 +211,6 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        // ----------------------------------------------------------------
-        // CLIENT JAVASCRIPT COMPLET (identique à la version précédente)
-        // ----------------------------------------------------------------
-        
         const socket = io();
         let currentRoom = null;
         let mySymbol = null;
@@ -323,8 +319,14 @@
         }
 
         function joinOrCreateGame() {
-            playerName = playerNameInput.value.trim() || 'Joueur';
-            if (playerName.length > 20) playerName = playerName.substring(0, 20);
+            const inputVal = playerNameInput.value.trim();
+            if (!inputVal) {
+                updateStatus('⚠️ Veuillez saisir un pseudo avant de commencer !', 'danger');
+                playerNameInput.focus();
+                return;
+            }
+            playerName = inputVal.substring(0, 20);
+
             const urlParams = new URLSearchParams(window.location.search);
             const roomParam = urlParams.get('room');
             if (roomParam) {
@@ -369,11 +371,7 @@
         // Événements Socket.IO
         socket.on('connect', () => {
             console.log('✅ Connecté au serveur');
-            const urlParams = new URLSearchParams(window.location.search);
-            const roomParam = urlParams.get('room');
-            if (roomParam && playerNameInput.value) {
-                setTimeout(() => joinOrCreateGame(), 300);
-            }
+            // La connexion automatique a été retirée pour imposer la saisie manuelle du pseudo
         });
 
         socket.on('connect_error', (error) => {
@@ -539,11 +537,7 @@
         const initialUrlParams = new URLSearchParams(window.location.search);
         const initialRoom = initialUrlParams.get('room');
         if (initialRoom) {
-            updateStatus(`🔗 Lien de partie détecté : salle ${initialRoom}. Entrez votre pseudo.`, 'info');
-        }
-
-        if (socket.connected && initialRoom && playerNameInput.value) {
-            setTimeout(() => joinOrCreateGame(), 200);
+            updateStatus(`🔗 Lien reçu pour la salle ${initialRoom}. Entrez votre pseudo pour commencer.`, 'info');
         }
 
         window.joinOrCreateGame = joinOrCreateGame;
