@@ -1,0 +1,338 @@
+/* Mêmes styles que précédemment + fond animé discret */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        /* Élément de fond évoquant le jeu (grille + X/O subtils) */
+        #bg-animated {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            background-color: transparent;
+            background-image:
+              url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'>\
+<rect width='100%' height='100%' fill='none'/>\
+<g stroke='%23ffffff' stroke-opacity='0.12' stroke-width='12' stroke-linecap='round'>\
+<line x1='100' y1='15' x2='100' y2='285'/>\
+<line x1='200' y1='15' x2='200' y2='285'/>\
+<line x1='15' y1='100' x2='285' y2='100'/>\
+<line x1='15' y1='200' x2='285' y2='200'/>\
+</g>\
+<g stroke='%23ffffff' stroke-opacity='0.08' stroke-width='10' stroke-linecap='round'>\
+<line x1='35' y1='35' x2='65' y2='65'/>\
+<line x1='35' y1='65' x2='65' y2='35'/>\
+<circle cx='150' cy='150' r='28' fill='none'/>\
+<line x1='235' y1='235' x2='265' y2='265'/>\
+<line x1='235' y1='265' x2='265' y2='235'/>\
+</g>\
+</svg>"),
+              radial-gradient(circle at 10% 20%, rgba(255,255,255,0.03), transparent 8%),
+              radial-gradient(circle at 80% 80%, rgba(255,255,255,0.02), transparent 12%),
+              linear-gradient(135deg, rgba(102,126,234,0.06), rgba(118,75,162,0.06));
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 56vmin;
+            mix-blend-mode: overlay;
+            opacity: 0.65;
+            filter: blur(12px) saturate(1.02);
+            transform: translateZ(0);
+            animation: bgFloat 28s ease-in-out infinite;
+        }
+
+        @keyframes bgFloat {
+            0% { transform: translate(-3%, -3%) rotate(-1deg) scale(1); }
+            50% { transform: translate(3%, 3%) rotate(1deg) scale(1.02); }
+            100% { transform: translate(-3%, -3%) rotate(-1deg) scale(1); }
+        }
+
+        .container {
+            position: relative; /* permet de rester au-dessus du fond animé */
+            z-index: 2; /* augmenté pour garantir visibilité */
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 520px;
+            width: 100%;
+            margin: auto; /* centre verticalement quand l'écran est grand */
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            font-size: 2.2em;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+        }
+        #status {
+            text-align: center;
+            padding: 12px 15px;
+            margin: 10px 0 20px 0;
+            border-radius: 12px;
+            font-weight: 600;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f0f0f0;
+            border: 2px solid transparent;
+        }
+        #status.waiting { background: #fff3cd; border-color: #ffc107; color: #856404; }
+        #status.success { background: #d4edda; border-color: #28a745; color: #155724; }
+        #status.danger { background: #f8d7da; border-color: #dc3545; color: #721c24; }
+        #status.info { background: #d1ecf1; border-color: #17a2b8; color: #0c5460; }
+        .player-input {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .player-input input {
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            font-size: 1em;
+            flex: 1;
+            min-width: 150px;
+            max-width: 250px;
+        }
+        .player-input input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 4px 18px rgba(102,126,234,0.12);
+        }
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .btn-warning { background: linear-gradient(135deg, #f6d365, #fda085); color: white; }
+        .btn-danger { background: linear-gradient(135deg, #ff0844, #ffb199); color: white; }
+        .controls {
+            position: relative;
+            z-index: 10002; /* s'assurer que les boutons apparaissent au-dessus */
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .controls button { position: relative; z-index: 10003; }
+        #room-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 12px;
+            margin: 15px 0;
+            text-align: center;
+            display: none;
+            border: 2px solid #e9ecef;
+        }
+        #room-link {
+            color: #667eea;
+            cursor: pointer;
+            text-decoration: underline;
+            font-weight: 600;
+        }
+        #board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .cell {
+            aspect-ratio: 1;
+            background: #f8f9fa;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 3px solid #e9ecef;
+            user-select: none;
+            min-height: 80px;
+        }
+        .cell.x { color: #dc3545; animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .cell.o { color: #007bff; animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .cell:not(.disabled):not(.taken):hover {
+            transform: scale(1.05);
+            background: #e9ecef;
+            border-color: #667eea;
+        }
+        .cell.disabled { cursor: not-allowed; opacity: 0.7; }
+        .cell.taken { cursor: default; }
+        .cell.winner { background: #d4edda !important; border-color: #28a745 !important; animation: pulse 1s ease-in-out infinite; }
+        @keyframes popIn {
+            0% { transform: scale(0.3) rotate(-20deg); opacity: 0; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        .hide { display: none !important; }
+        .version { text-align: center; color: #999; font-size: 0.75em; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e9ecef; }
+
+        /* Styles additionnels - Scoreboard */
+        #scoreboard {
+            display: flex;
+            justify-content: space-around;
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 10px 15px;
+            margin: 15px 0;
+            border: 2px solid #e9ecef;
+            gap: 10px;
+        }
+        .score-player {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            font-size: 0.9em;
+            font-weight: 600;
+            color: #555;
+            text-align: center;
+        }
+        .score-badge {
+            background: #e9ecef;
+            color: #333;
+            border-radius: 20px;
+            padding: 2px 12px;
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-top: 4px;
+            min-width: 30px;
+            text-align: center;
+        }
+        .score-x .score-badge { background: #fde8eb; color: #dc3545; }
+        .score-o .score-badge { background: #e8f4fd; color: #007bff; }
+        .score-draw .score-badge { background: #fffdf5; color: #ffc107; }
+
+        /* Styles additionnels - Reaction Panel */
+        #reaction-panel {
+            margin-top: 15px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+            padding-top: 15px;
+        }
+        .reaction-title {
+            font-size: 0.85em;
+            color: #777;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .reaction-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .btn-react {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            padding: 8px;
+            font-size: 1.4em;
+            cursor: pointer;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            min-width: unset;
+        }
+        .btn-react:hover {
+            transform: scale(1.2) rotate(10deg);
+            background: #fff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        /* Styles additionnels - Toasts */
+        #reaction-toast-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+        }
+        .reaction-toast {
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid #667eea;
+            color: #333;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-weight: 600;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1.1em;
+            animation: slideDownIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), fadeOutUp 0.3s ease-in 2.5s forwards;
+            pointer-events: none;
+        }
+        @keyframes slideDownIn {
+            0% { transform: translateY(-50px) scale(0.8); opacity: 0; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        @keyframes fadeOutUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-30px) scale(0.8); opacity: 0; }
+        }
+
+        /* Respecter la préférence de réduction d'animations */
+        @media (prefers-reduced-motion: reduce) {
+            #bg-animated { animation: none; filter: none; }
+            .cell.x, .cell.o, .cell.winner { animation: none; }
+            .reaction-toast { animation: none; opacity: 0.9; }
+        }
+
+        @media (max-width: 480px) {
+            .container { padding: 15px; }
+            .cell { font-size: 2.8em; min-height: 60px; }
+            button { padding: 10px 15px; min-width: 80px; font-size: 0.9em; }
+        }
