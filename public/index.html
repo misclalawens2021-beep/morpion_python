@@ -11,15 +11,15 @@
             padding: 0;
             box-sizing: border-box;
         }
-        body {
+body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start;
             padding: 20px;
-            overflow: hidden; /* empêche le fond animé de provoquer des barres de scroll */
+            overflow-y: auto;
         }
 
         /* Élément de fond évoquant le jeu (grille + X/O subtils) */
@@ -73,6 +73,7 @@
             padding: 30px;
             max-width: 520px;
             width: 100%;
+            margin: auto; /* centre verticalement quand l'écran est grand */
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
         h1 {
