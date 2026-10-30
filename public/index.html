@@ -21,6 +21,18 @@
             <p style="text-align:center; font-size:0.8em; color:#888; margin-top:5px;">
                 ou partagez un lien pour inviter un ami
             </p>
+            <div class="solo-section">
+                <span class="solo-separator">— ou —</span>
+                <div class="solo-controls">
+                    <label for="solo-level">Niveau :</label>
+                    <select id="solo-level">
+                        <option value="easy">😊 Facile</option>
+                        <option value="medium">🙂 Moyen</option>
+                        <option value="hard" selected>😈 Imbattable</option>
+                    </select>
+                    <button class="btn-solo" id="solo-btn" onclick="startSoloGame()">🤖 Jouer contre l'ordinateur</button>
+                </div>
+            </div>
         </div>
 
         <div id="status">Entrez votre pseudo et cliquez sur Commencer</div>

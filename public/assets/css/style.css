@@ -427,6 +427,45 @@ button:disabled {
     animation: apparait 0.25s steps(4) both, disparait 0.25s steps(4) 2.5s forwards;
 }
 
+/* ---------- Mode solo (contre l'ordinateur) ---------- */
+.solo-section {
+    margin-top: 18px;
+    text-align: center;
+}
+.solo-separator {
+    display: block;
+    color: var(--discret);
+    font-size: 0.6em;
+    margin-bottom: 14px;
+}
+.solo-controls {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.solo-controls label {
+    font-size: 0.6em;
+    color: var(--discret);
+}
+.solo-controls select {
+    font-family: inherit;
+    font-size: 0.65em;
+    padding: 12px 10px;
+    background: var(--noir);
+    color: var(--jaune);
+    border: 3px solid var(--bord);
+    border-radius: 0;
+    cursor: pointer;
+}
+.solo-controls select:focus {
+    outline: none;
+    border-color: var(--jaune);
+    box-shadow: 0 0 12px rgba(255, 230, 0, 0.4);
+}
+.btn-solo { background: var(--o); color: var(--noir); }
+
 /* ---------- Divers ---------- */
 .hide { display: none !important; }
 .version {

@@ -1,4 +1,4 @@
-        const socket = io();
+const socket = io();
         let currentRoom = null;
         let mySymbol = null;
         let boardState = [];
@@ -7,6 +7,7 @@
         let playerName = '';
         let opponentName = 'Adversaire';
         let isWaiting = false;
+        let soloMode = false; // true = partie contre l'ordinateur (sans serveur)
 
         const boardDiv = document.getElementById('board');
         const statusDiv = document.getElementById('status');
@@ -47,7 +48,7 @@
 
         function updateBoardStyle() {
             const cells = document.querySelectorAll('.cell');
-            const isMyTurn = (mySymbol === statusTurn) && !gameOver && currentRoom !== null && !isWaiting;
+            const isMyTurn = (mySymbol === statusTurn) && !gameOver && (currentRoom !== null || soloMode) && !isWaiting;
             cells.forEach((cell, idx) => {
                 const val = boardState[idx];
                 if (val !== 0 || !isMyTurn || gameOver || isWaiting) cell.classList.add('disabled');
@@ -155,6 +156,7 @@
         }
 
         function handleCellClick(index) {
+            if (soloMode) { soloPlayerMove(index); return; }
             if (gameOver || currentRoom === null || isWaiting) return;
             if (boardState[index] !== 0) return;
             if (mySymbol !== statusTurn) return;
@@ -205,6 +207,7 @@
         }
 
         function resetGame() {
+            if (soloMode) { soloReset(); return; }
             if (currentRoom) {
                 socket.emit('reset_game', { room: currentRoom });
                 updateStatus('🔄 Réinitialisation en cours...', 'info');
@@ -212,6 +215,7 @@
         }
 
         function quitGame() {
+            if (soloMode) { soloQuit(); return; }
             if (currentRoom) {
                 socket.emit('leave_game', { room: currentRoom });
                 updateStatus('👋 Déconnexion en cours...', 'info');
@@ -230,6 +234,193 @@
 
         function updatePlayerCount(count) {
             playerCountSpan.textContent = count;
+        }
+
+        // ================================================================
+        // MODE SOLO : JOUEUR (X) CONTRE ORDINATEUR (O) — tout se passe dans le navigateur
+        // ================================================================
+
+        // --- IA ---
+        const WIN_COMBOS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+        function soloCheckWinner(board) {
+            for (const combo of WIN_COMBOS) {
+                const [a, b, c] = combo;
+                if (board[a] !== 0 && board[a] === board[b] && board[b] === board[c]) {
+                    return { winner: board[a] === 1 ? 'X' : 'O', combo };
+                }
+            }
+            if (board.every(v => v !== 0)) return { winner: 'draw', combo: null };
+            return null;
+        }
+
+        function emptyCells(board) {
+            return board.map((v, i) => (v === 0 ? i : -1)).filter(i => i >= 0);
+        }
+
+        function randomItem(list) {
+            return list[Math.floor(Math.random() * list.length)];
+        }
+
+        // Renvoie une case qui fait gagner immédiatement `value` (1 = X, 2 = O), sinon -1
+        function findWinningCell(board, value) {
+            for (const i of emptyCells(board)) {
+                const copy = board.slice();
+                copy[i] = value;
+                const result = soloCheckWinner(copy);
+                if (result && result.winner === (value === 1 ? 'X' : 'O')) return i;
+            }
+            return -1;
+        }
+
+        // Minimax : O cherche à maximiser le score, X à le minimiser
+        function minimax(board, oTurn, depth) {
+            const result = soloCheckWinner(board);
+            if (result) {
+                if (result.winner === 'O') return 10 - depth;
+                if (result.winner === 'X') return depth - 10;
+                return 0;
+            }
+            let best = oTurn ? -Infinity : Infinity;
+            for (const i of emptyCells(board)) {
+                board[i] = oTurn ? 2 : 1;
+                const score = minimax(board, !oTurn, depth + 1);
+                board[i] = 0;
+                best = oTurn ? Math.max(best, score) : Math.min(best, score);
+            }
+            return best;
+        }
+
+        // level : 'easy' (au hasard), 'medium' (gagne / bloque, sinon au hasard), 'hard' (imbattable)
+        function computerChooseMove(board, level) {
+            const free = emptyCells(board);
+            if (level === 'easy') return randomItem(free);
+
+            const win = findWinningCell(board, 2);
+            if (win !== -1) return win;
+            const block = findWinningCell(board, 1);
+            if (block !== -1) return block;
+            if (level === 'medium') return randomItem(free);
+
+            if (free.length === 9) return randomItem([0, 2, 4, 6, 8]);
+            let bestScore = -Infinity;
+            let bestCells = [];
+            for (const i of free) {
+                const copy = board.slice();
+                copy[i] = 2;
+                const score = minimax(copy, false, 1);
+                if (score > bestScore) { bestScore = score; bestCells = [i]; }
+                else if (score === bestScore) bestCells.push(i);
+            }
+            return randomItem(bestCells);
+        }
+        // --- FIN IA ---
+
+        let soloLevel = 'hard';
+        let soloBoard = [];
+        let soloTurn = 'X';
+        let soloStarter = 'X';
+        let soloScores = { X: 0, O: 0, draws: 0 };
+        let soloTimer = null;
+
+        function startSoloGame() {
+            playerName = (playerNameInput.value.trim() || 'Joueur').substring(0, 20);
+            opponentName = 'Ordinateur';
+            soloLevel = document.getElementById('solo-level').value;
+            soloMode = true;
+            currentRoom = null;
+            mySymbol = 'X';
+            isWaiting = false;
+            soloScores = { X: 0, O: 0, draws: 0 };
+            soloStarter = 'X';
+
+            nameSection.style.display = 'none';
+            roomInfoDiv.style.display = 'none';
+            document.getElementById('reaction-panel').classList.add('hide');
+            quitBtn.classList.remove('hide');
+            soloNewRound();
+        }
+
+        function soloNewRound() {
+            clearTimeout(soloTimer);
+            soloBoard = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+            soloTurn = soloStarter;
+            gameOver = false;
+            soloRender(null);
+            if (soloTurn === 'O') soloScheduleComputer();
+        }
+
+        function soloScheduleComputer() {
+            soloTimer = setTimeout(() => {
+                if (!soloMode || gameOver) return;
+                soloBoard[computerChooseMove(soloBoard, soloLevel)] = 2;
+                soloAfterMove();
+            }, 500 + Math.random() * 400);
+        }
+
+        function soloPlayerMove(index) {
+            if (!soloMode || gameOver || soloTurn !== 'X' || soloBoard[index] !== 0) return;
+            soloBoard[index] = 1;
+            soloAfterMove();
+        }
+
+        function soloAfterMove() {
+            const result = soloCheckWinner(soloBoard);
+            if (result) {
+                gameOver = true;
+                soloTurn = null;
+                if (result.winner === 'X') soloScores.X++;
+                else if (result.winner === 'O') soloScores.O++;
+                else soloScores.draws++;
+                soloRender(result);
+                return;
+            }
+            soloTurn = soloTurn === 'X' ? 'O' : 'X';
+            soloRender(null);
+            if (soloTurn === 'O') soloScheduleComputer();
+        }
+
+        function soloRender(result) {
+            boardState = soloBoard;
+            statusTurn = soloTurn;
+            renderBoard(boardState, result ? result.combo : null);
+            updateScoreboard(soloScores);
+            document.getElementById('scoreboard').classList.remove('hide');
+
+            let msg, type;
+            if (result) {
+                if (result.winner === 'X') { msg = '🏆 Vous avez gagné !'; type = 'success'; }
+                else if (result.winner === 'O') { msg = "🤖 L'ordinateur a gagné !"; type = 'danger'; }
+                else { msg = '🤝 Match nul !'; type = 'info'; }
+                msg += ' 🔄 Cliquez sur "Nouvelle partie" pour rejouer.';
+                resetBtn.classList.remove('hide');
+            } else {
+                if (soloTurn === 'X') { msg = '🎯 À vous de jouer 👈'; type = 'success'; }
+                else { msg = "🤖 L'ordinateur réfléchit..."; type = 'info'; }
+                resetBtn.classList.add('hide');
+            }
+            updateStatus(msg, type);
+        }
+
+        // Nouvelle manche : le joueur qui commence alterne
+        function soloReset() {
+            soloStarter = soloStarter === 'X' ? 'O' : 'X';
+            soloNewRound();
+        }
+
+        function soloQuit() {
+            clearTimeout(soloTimer);
+            soloMode = false;
+            gameOver = true;
+            mySymbol = null;
+            statusTurn = null;
+            boardDiv.innerHTML = '';
+            resetBtn.classList.add('hide');
+            quitBtn.classList.add('hide');
+            document.getElementById('scoreboard').classList.add('hide');
+            nameSection.style.display = 'block';
+            startBtn.disabled = false;
+            updateStatus("👋 Vous avez quitté la partie contre l'ordinateur", 'info');
         }
 
         // Événements Socket.IO
@@ -437,5 +628,6 @@
         window.quitGame = quitGame;
         window.copyRoomLink = copyRoomLink;
         window.sendReaction = sendReaction;
+        window.startSoloGame = startSoloGame;
 
         console.log('🎮 Morpion Multijoueur - Client prêt !');
