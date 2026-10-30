@@ -48,6 +48,7 @@ const games = {};
 //   'playersNames': { 'X': 'nom1', 'O': 'nom2' },
 //   'board': [0,0,0,0,0,0,0,0,0],
 //   'turn': 'X',
+//   'starter': 'X',  // joueur qui commence la manche (alterne à chaque reprise)
 //   'winner': null,
 //   'winningCombo': null,
 //   'scores': { 'X': 0, 'O': 0, 'draws': 0 },
@@ -229,6 +230,7 @@ io.on('connection', (socket) => {
                 playersNames: {},
                 board: [0, 0, 0, 0, 0, 0, 0, 0, 0],
                 turn: 'X',
+                starter: 'X',
                 winner: null,
                 winningCombo: null,
                 scores: { 'X': 0, 'O': 0, 'draws': 0 },
@@ -471,7 +473,9 @@ io.on('connection', (socket) => {
         
         // Réinitialiser le jeu (en conservant les scores)
         game.board = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-        game.turn = 'X';
+        // Alterner le joueur qui commence à chaque nouvelle manche
+        game.starter = game.starter === 'X' ? 'O' : 'X';
+        game.turn = game.starter;
         game.winner = null;
         game.winningCombo = null;
         game.lastMove = Date.now();
