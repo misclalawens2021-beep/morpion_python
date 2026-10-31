@@ -9,10 +9,12 @@
  * - Le tableau est tiré au sort : 2 joueurs = finale, 3-4 = demi-finales,
  *   5-8 = quarts de finale. Quand le nombre de joueurs n'est pas une puissance
  *   de 2, certains joueurs sont qualifiés d'office pour le tour suivant.
- * - Chaque match se joue en 10 POINTS : une manche gagnée = 1 point, le premier
- *   à 10 points gagne le match. Un match nul ne rapporte rien et la manche est
- *   rejouée. X et O s'inversent à chaque manche, donc les deux joueurs
- *   commencent à tour de rôle.
+ * - Chaque match se joue en 10 MANCHES : une manche gagnée = 1 point, une manche
+ *   nulle = 0 point (elle compte quand même comme jouée). À la fin de la 10e
+ *   manche, le meilleur score gagne le match.
+ * - En cas d'égalité après la 10e manche : MORT SUBITE. Le premier qui gagne une
+ *   manche remporte le match (une manche nulle est alors rejouée).
+ * - X et O s'inversent à chaque manche, donc les deux joueurs commencent à tour de rôle.
  * - Un joueur déconnecté a 30 s pour revenir, sinon il perd par forfait.
  *
  * Le serveur est l'arbitre : il valide chaque coup, puis envoie à tous les
@@ -28,7 +30,7 @@
 const MAX_PLAYERS = 8;
 const MIN_PLAYERS = 2;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sans 0/O/1/I pour éviter les confusions
-const POINTS_TO_WIN = 10;                               // nombre de points pour gagner un match
+const MANCHES_PER_MATCH = 10;                           // nombre de manches d'un match (avant mort subite)
 const INACTIVE_MS = 60 * 60 * 1000;                    // un tournoi inactif 1 h est supprimé
 const FINISHED_MS = 15 * 60 * 1000;                    // un tournoi terminé est gardé 15 min (le temps de voir le résultat)
 
@@ -39,8 +41,8 @@ const FINISHED_MS = 15 * 60 * 1000;                    // un tournoi terminé es
  * @param {Function} deps.checkWinner - fonction de victoire de server.js
  * @param {number} [deps.graceMs=30000] - délai avant forfait d'un joueur déconnecté
  * @param {number} [deps.winDelayMs=2500] - pause d'affichage après la victoire d'un match
- * @param {number} [deps.drawDelayMs=1500] - pause d'affichage après un nul ou un point marqué
- * @param {number} [deps.pointsToWin=10] - points nécessaires pour gagner un match
+ * @param {number} [deps.drawDelayMs=1500] - pause d'affichage entre deux manches
+ * @param {number} [deps.manches=10] - nombre de manches d'un match avant la mort subite
  */
 module.exports = function createTournamentModule({
     io,
@@ -48,8 +50,9 @@ module.exports = function createTournamentModule({
     graceMs = 30000,
     winDelayMs = 2500,
     drawDelayMs = 1500,
-    pointsToWin = POINTS_TO_WIN
+    manches = MANCHES_PER_MATCH
 }) {
+    const manchesPerMatch = manches;
     // code -> tournoi
     const tournaments = {};
     // socket.id -> { code, pub } (qui est connecté à quel tournoi)
@@ -78,7 +81,7 @@ module.exports = function createTournamentModule({
     //   bye, winner, board, turn,        // turn = 'X' | 'O'
     //   sym: { X: pub, O: pub },         // qui joue quel symbole (s'inverse à chaque manche)
     //   score1, score2,                  // points de p1 et de p2
-    //   manche,                          // numéro de la manche en cours
+    //   manche,                          // numéro de la manche en cours (> 10 = mort subite)
     //   lastPoint,                       // 'pub' du joueur qui a marqué la dernière manche
     //   combo, replays, forfeit
     // }
@@ -180,7 +183,7 @@ module.exports = function createTournamentModule({
             host: t.host,
             maxPlayers: MAX_PLAYERS,
             minPlayers: MIN_PLAYERS,
-            target: pointsToWin,
+            target: manchesPerMatch, // nombre de manches d'un match (la mort subite commence après)
             champion: t.champion,
             roundNames: roundNames(t.rounds.length),
             players: t.players.map(p => ({
@@ -317,7 +320,7 @@ module.exports = function createTournamentModule({
         m.score1 = 0;
         m.score2 = 0;
         m.manche = 1;
-        notice(t, `⚔️ ${nameOf(t, m.p1)} contre ${nameOf(t, m.p2)} (premier à ${pointsToWin} points)`);
+        notice(t, `⚔️ ${nameOf(t, m.p1)} contre ${nameOf(t, m.p2)} (${manchesPerMatch} manches)`);
     }
 
     /** Match terminé (après la pause d'affichage) : on fait avancer le vainqueur. */
@@ -343,6 +346,43 @@ module.exports = function createTournamentModule({
         m.manche++;
         m.status = 'playing';
         broadcast(t);
+    }
+
+    /**
+     * Fin d'une manche : compte le point, puis décide si le match est terminé.
+     * @param {string|null} scorer - 'pub' du joueur qui a gagné la manche, null si nulle
+     *
+     * - manches 1 à 9 : on enchaîne toujours
+     * - 10e manche : le meilleur score gagne ; égalité = mort subite
+     * - mort subite (manche 11 et plus) : la première manche gagnée décide, un nul se rejoue
+     */
+    function resolveManche(t, m, scorer) {
+        const suddenDeath = m.manche > manchesPerMatch;
+        if (scorer) {
+            if (scorer === m.p1) m.score1++; else m.score2++;
+            m.lastPoint = scorer;
+        }
+
+        let winner = null;
+        if (suddenDeath) {
+            winner = scorer;
+        } else if (m.manche >= manchesPerMatch && m.score1 !== m.score2) {
+            winner = m.score1 > m.score2 ? m.p1 : m.p2;
+        }
+
+        if (winner) {
+            m.status = 'over';
+            m.winner = winner;
+            notice(t, `🏅 ${nameOf(t, winner)} gagne son match (${m.score1}-${m.score2}${suddenDeath ? ', mort subite' : ''})`);
+            setTimer(`${t.code}:${m.id}`, winDelayMs, () => completeMatch(t, m));
+            return;
+        }
+
+        if (!suddenDeath && m.manche >= manchesPerMatch) {
+            notice(t, `⚡ Égalité ${m.score1}-${m.score2} : mort subite entre ${nameOf(t, m.p1)} et ${nameOf(t, m.p2)} !`);
+        }
+        m.status = scorer ? 'point' : 'draw';
+        setTimer(`${t.code}:${m.id}`, drawDelayMs, () => nextManche(t, m));
     }
 
     /** Match en cours (ou en attente de rejeu) d'un joueur. */
@@ -558,28 +598,14 @@ module.exports = function createTournamentModule({
             if (!result) {
                 m.turn = mySymbol === 'X' ? 'O' : 'X';
             } else if (result.winner === 'draw') {
-                // Nul : aucun point, on rejoue la manche
-                m.status = 'draw';
+                // Nul : aucun point, mais la manche compte comme jouée
                 m.combo = null;
                 m.replays++;
-                setTimer(`${t.code}:${m.id}`, drawDelayMs, () => nextManche(t, m));
+                resolveManche(t, m, null);
             } else {
                 // Manche gagnée : +1 point pour le vainqueur de la manche
-                const scorer = m.sym[result.winner];
-                if (scorer === m.p1) m.score1++; else m.score2++;
-                m.lastPoint = scorer;
                 m.combo = result.combo;
-
-                if (Math.max(m.score1, m.score2) >= pointsToWin) {
-                    // Objectif atteint : le match est gagné
-                    m.status = 'over';
-                    m.winner = scorer;
-                    notice(t, `🏅 ${nameOf(t, scorer)} gagne son match (${m.score1}-${m.score2})`);
-                    setTimer(`${t.code}:${m.id}`, winDelayMs, () => completeMatch(t, m));
-                } else {
-                    m.status = 'point';
-                    setTimer(`${t.code}:${m.id}`, drawDelayMs, () => nextManche(t, m));
-                }
+                resolveManche(t, m, m.sym[result.winner]);
             }
             broadcast(t);
         });

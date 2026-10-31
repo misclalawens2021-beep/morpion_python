@@ -712,7 +712,7 @@
             document.getElementById('tournament-count').textContent = `${st.players.length}/${st.maxPlayers}`;
             document.getElementById('tournament-invite').classList.toggle('hide', st.status !== 'lobby');
             document.getElementById('tournament-rules').textContent =
-                `🎯 Matchs en ${st.target} points : 1 point par manche gagnée, le nul se rejoue`;
+                `🎯 Matchs en ${st.target} manches (1 point par manche gagnée). Égalité : mort subite, la première manche gagnée décide`;
             renderTournamentPlayers(st);
 
             const isHost = st.host === tournamentYou;
@@ -765,14 +765,17 @@
                 const myScore = iAmP1 ? m.s1 : m.s2;
                 const oppScore = iAmP1 ? m.s2 : m.s1;
                 const opp = tournamentNameOf(st, iAmP1 ? m.p2 : m.p1);
-                renderTournamentScore(st, me, opp, myScore, oppScore);
+                renderTournamentScore(st, me, opp, myScore, oppScore, m);
 
                 const score = `${myScore}-${oppScore}`;
+                const suddenDeath = m.manche > st.target;
+                // « manche 4/10 » ou « MORT SUBITE »
+                const mancheLabel = suddenDeath ? '⚡ MORT SUBITE' : `manche ${m.manche}/${st.target}`;
                 if (m.status === 'playing') {
                     if (m.turn === mySymbol) {
-                        updateStatus(`🎯 ${myRoundName}, manche ${m.manche} (${score}) : à vous de jouer (${mySymbol})`, 'success');
+                        updateStatus(`🎯 ${myRoundName}, ${mancheLabel} (${score}) : à vous de jouer (${mySymbol})`, 'success');
                     } else {
-                        updateStatus(`⏳ ${myRoundName}, manche ${m.manche} (${score}) : tour de ${opp} (${m.turn})...`, 'info');
+                        updateStatus(`⏳ ${myRoundName}, ${mancheLabel} (${score}) : tour de ${opp} (${m.turn})...`, 'info');
                     }
                 } else if (m.status === 'point') {
                     if (m.lastPoint === tournamentYou) {
@@ -781,11 +784,13 @@
                         updateStatus(`💢 Point pour ${opp} (${score}) Manche suivante...`, 'danger');
                     }
                 } else if (m.status === 'draw') {
-                    updateStatus(`🤝 Manche nulle, aucun point (${score}). On rejoue...`, 'info');
+                    updateStatus(`🤝 Manche nulle, aucun point (${score}). Manche suivante...`, 'info');
                 } else if (m.winner === tournamentYou) {
-                    updateStatus(m.forfeit ? `🏆 ${opp} a abandonné : vous êtes qualifié !` : `🏆 Vous battez ${opp} ${score} et passez au tour suivant !`, 'success');
+                    const how = suddenDeath ? ' en mort subite' : '';
+                    updateStatus(m.forfeit ? `🏆 ${opp} a abandonné : vous êtes qualifié !` : `🏆 Vous battez ${opp} ${score}${how} et passez au tour suivant !`, 'success');
                 } else {
-                    updateStatus(`💥 Défaite contre ${opp} (${score})... vous êtes éliminé`, 'danger');
+                    const how = suddenDeath ? ' en mort subite' : '';
+                    updateStatus(`💥 Défaite contre ${opp} (${score})${how}... vous êtes éliminé`, 'danger');
                 }
                 return;
             }
@@ -807,15 +812,16 @@
 
         /**
          * Réutilise le tableau des scores pour afficher le score du match en cours :
-         * moi à gauche, l'adversaire à droite, l'objectif au milieu.
+         * moi à gauche, l'adversaire à droite, le numéro de manche au milieu.
          */
-        function renderTournamentScore(st, me, oppName, myScore, oppScore) {
+        function renderTournamentScore(st, me, oppName, myScore, oppScore, m) {
             document.getElementById('score-name-x').textContent = me ? me.name : 'Vous';
             document.getElementById('score-val-x').textContent = myScore;
             document.getElementById('score-name-o').textContent = oppName;
             document.getElementById('score-val-o').textContent = oppScore;
-            document.querySelector('.score-draw span').textContent = 'Objectif';
-            document.getElementById('score-val-draw').textContent = st.target;
+            const suddenDeath = m.manche > st.target;
+            document.querySelector('.score-draw span').textContent = suddenDeath ? 'Mort subite' : 'Manche';
+            document.getElementById('score-val-draw').textContent = suddenDeath ? '⚡' : `${m.manche}/${st.target}`;
             document.getElementById('scoreboard').classList.remove('hide');
         }
 
@@ -881,7 +887,9 @@
 
                     let note = '';
                     if (m.bye) note = 'qualifié d\'office';
-                    else if (m.status === 'playing' || m.status === 'point' || m.status === 'draw') note = `⚔️ manche ${m.manche}`;
+                    else if (m.status === 'playing' || m.status === 'point' || m.status === 'draw') {
+                        note = m.manche > st.target ? '⚡ mort subite' : `⚔️ manche ${m.manche}/${st.target}`;
+                    }
                     else if (m.forfeit && m.winner) note = 'par forfait';
                     if (note) {
                         const noteDiv = document.createElement('div');
