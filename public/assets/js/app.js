@@ -684,6 +684,8 @@
             statusTurn = null;
             gameOver = true;
             boardDiv.innerHTML = '';
+            document.getElementById('scoreboard').classList.add('hide');
+            document.querySelector('.score-draw span').textContent = 'Nuls';
             document.getElementById('tournament-top').classList.add('hide');
             document.getElementById('tournament-bracket').classList.add('hide');
             document.getElementById('tournament-bracket').innerHTML = '';
@@ -709,6 +711,8 @@
             document.getElementById('tournament-code-label').textContent = st.code;
             document.getElementById('tournament-count').textContent = `${st.players.length}/${st.maxPlayers}`;
             document.getElementById('tournament-invite').classList.toggle('hide', st.status !== 'lobby');
+            document.getElementById('tournament-rules').textContent =
+                `🎯 Matchs en ${st.target} points : 1 point par manche gagnée, le nul se rejoue`;
             renderTournamentPlayers(st);
 
             const isHost = st.host === tournamentYou;
@@ -723,6 +727,7 @@
             // --- Salon d'attente ---
             if (st.status === 'lobby') {
                 boardDiv.innerHTML = '';
+                document.getElementById('scoreboard').classList.add('hide');
                 mySymbol = null; statusTurn = null; gameOver = true;
                 if (!isHost) {
                     updateStatus(`⏳ En attente du lancement par ${tournamentNameOf(st, st.host)} (${st.players.length}/${st.maxPlayers})`, 'waiting');
@@ -739,7 +744,7 @@
             let myRoundName = '';
             st.rounds.forEach((round, r) => {
                 round.forEach(m => {
-                    if ((m.status === 'playing' || m.status === 'draw' || m.status === 'over') &&
+                    if ((m.status === 'playing' || m.status === 'point' || m.status === 'draw' || m.status === 'over') &&
                         (m.p1 === tournamentYou || m.p2 === tournamentYou)) {
                         myMatch = m;
                         myRoundName = st.roundNames[r];
@@ -756,25 +761,38 @@
                 boardState = m.board.slice();
                 renderBoard(boardState, m.combo);
 
-                const opp = tournamentNameOf(st, m.p1 === tournamentYou ? m.p2 : m.p1);
+                const iAmP1 = m.p1 === tournamentYou;
+                const myScore = iAmP1 ? m.s1 : m.s2;
+                const oppScore = iAmP1 ? m.s2 : m.s1;
+                const opp = tournamentNameOf(st, iAmP1 ? m.p2 : m.p1);
+                renderTournamentScore(st, me, opp, myScore, oppScore);
+
+                const score = `${myScore}-${oppScore}`;
                 if (m.status === 'playing') {
                     if (m.turn === mySymbol) {
-                        updateStatus(`🎯 ${myRoundName} : à vous de jouer (${mySymbol}) contre ${opp}`, 'success');
+                        updateStatus(`🎯 ${myRoundName}, manche ${m.manche} (${score}) : à vous de jouer (${mySymbol})`, 'success');
                     } else {
-                        updateStatus(`⏳ ${myRoundName} : tour de ${opp} (${m.turn})...`, 'info');
+                        updateStatus(`⏳ ${myRoundName}, manche ${m.manche} (${score}) : tour de ${opp} (${m.turn})...`, 'info');
+                    }
+                } else if (m.status === 'point') {
+                    if (m.lastPoint === tournamentYou) {
+                        updateStatus(`✅ Point pour vous ! (${score}) Manche suivante...`, 'success');
+                    } else {
+                        updateStatus(`💢 Point pour ${opp} (${score}) Manche suivante...`, 'danger');
                     }
                 } else if (m.status === 'draw') {
-                    updateStatus('🤝 Match nul ! On rejoue, les symboles s\'inversent...', 'info');
+                    updateStatus(`🤝 Manche nulle, aucun point (${score}). On rejoue...`, 'info');
                 } else if (m.winner === tournamentYou) {
-                    updateStatus(m.forfeit ? `🏆 ${opp} a abandonné : vous êtes qualifié !` : `🏆 Vous battez ${opp} !`, 'success');
+                    updateStatus(m.forfeit ? `🏆 ${opp} a abandonné : vous êtes qualifié !` : `🏆 Vous battez ${opp} ${score} et passez au tour suivant !`, 'success');
                 } else {
-                    updateStatus(`💥 Défaite contre ${opp}... vous êtes éliminé`, 'danger');
+                    updateStatus(`💥 Défaite contre ${opp} (${score})... vous êtes éliminé`, 'danger');
                 }
                 return;
             }
 
             // --- Pas de match en cours pour moi ---
             boardDiv.innerHTML = '';
+            document.getElementById('scoreboard').classList.add('hide');
             mySymbol = null; statusTurn = null; gameOver = true;
             if (st.champion === tournamentYou) {
                 updateStatus('👑 VOUS ÊTES LE CHAMPION DU TOURNOI !', 'success');
@@ -785,6 +803,20 @@
             } else {
                 updateStatus('⏳ Qualifié ! En attente de votre prochain adversaire...', 'waiting');
             }
+        }
+
+        /**
+         * Réutilise le tableau des scores pour afficher le score du match en cours :
+         * moi à gauche, l'adversaire à droite, l'objectif au milieu.
+         */
+        function renderTournamentScore(st, me, oppName, myScore, oppScore) {
+            document.getElementById('score-name-x').textContent = me ? me.name : 'Vous';
+            document.getElementById('score-val-x').textContent = myScore;
+            document.getElementById('score-name-o').textContent = oppName;
+            document.getElementById('score-val-o').textContent = oppScore;
+            document.querySelector('.score-draw span').textContent = 'Objectif';
+            document.getElementById('score-val-draw').textContent = st.target;
+            document.getElementById('scoreboard').classList.remove('hide');
         }
 
         /** Liste des joueurs du salon (couronne pour l'hôte, vert pour moi). */
@@ -822,7 +854,7 @@
                 round.forEach(m => {
                     const card = document.createElement('div');
                     card.className = 'bracket-match';
-                    if (m.status === 'playing' || m.status === 'draw') card.classList.add('live');
+                    if (m.status === 'playing' || m.status === 'point' || m.status === 'draw') card.classList.add('live');
 
                     [m.p1, m.p2].forEach(pub => {
                         const row = document.createElement('div');
@@ -831,7 +863,15 @@
                             row.classList.add('tbd');
                             row.textContent = '…';
                         } else {
-                            row.textContent = tournamentNameOf(st, pub);
+                            const nameSpan = document.createElement('span');
+                            nameSpan.textContent = tournamentNameOf(st, pub);
+                            row.appendChild(nameSpan);
+                            if (m.status !== 'pending' && !m.bye) {
+                                const scoreSpan = document.createElement('span');
+                                scoreSpan.className = 'bracket-score';
+                                scoreSpan.textContent = pub === m.p1 ? m.s1 : m.s2;
+                                row.appendChild(scoreSpan);
+                            }
                             if (m.winner === pub) row.classList.add('winner');
                             if (m.winner && m.winner !== pub) row.classList.add('loser');
                             if (pub === tournamentYou) row.classList.add('me');
@@ -841,8 +881,7 @@
 
                     let note = '';
                     if (m.bye) note = 'qualifié d\'office';
-                    else if (m.status === 'playing') note = '⚔️ en cours';
-                    else if (m.status === 'draw') note = '🤝 nul, on rejoue';
+                    else if (m.status === 'playing' || m.status === 'point' || m.status === 'draw') note = `⚔️ manche ${m.manche}`;
                     else if (m.forfeit && m.winner) note = 'par forfait';
                     if (note) {
                         const noteDiv = document.createElement('div');

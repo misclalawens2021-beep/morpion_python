@@ -9,8 +9,10 @@
  * - Le tableau est tiré au sort : 2 joueurs = finale, 3-4 = demi-finales,
  *   5-8 = quarts de finale. Quand le nombre de joueurs n'est pas une puissance
  *   de 2, certains joueurs sont qualifiés d'office pour le tour suivant.
- * - Chaque match est une manche de morpion. En cas de match nul, on rejoue
- *   immédiatement en inversant X et O (il faut toujours un vainqueur).
+ * - Chaque match se joue en 10 POINTS : une manche gagnée = 1 point, le premier
+ *   à 10 points gagne le match. Un match nul ne rapporte rien et la manche est
+ *   rejouée. X et O s'inversent à chaque manche, donc les deux joueurs
+ *   commencent à tour de rôle.
  * - Un joueur déconnecté a 30 s pour revenir, sinon il perd par forfait.
  *
  * Le serveur est l'arbitre : il valide chaque coup, puis envoie à tous les
@@ -26,6 +28,7 @@
 const MAX_PLAYERS = 8;
 const MIN_PLAYERS = 2;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sans 0/O/1/I pour éviter les confusions
+const POINTS_TO_WIN = 10;                               // nombre de points pour gagner un match
 const INACTIVE_MS = 60 * 60 * 1000;                    // un tournoi inactif 1 h est supprimé
 const FINISHED_MS = 15 * 60 * 1000;                    // un tournoi terminé est gardé 15 min (le temps de voir le résultat)
 
@@ -35,15 +38,17 @@ const FINISHED_MS = 15 * 60 * 1000;                    // un tournoi terminé es
  * @param {import('socket.io').Server} deps.io - serveur Socket.IO
  * @param {Function} deps.checkWinner - fonction de victoire de server.js
  * @param {number} [deps.graceMs=30000] - délai avant forfait d'un joueur déconnecté
- * @param {number} [deps.winDelayMs=2500] - pause d'affichage après une victoire
- * @param {number} [deps.drawDelayMs=1500] - pause d'affichage après un match nul
+ * @param {number} [deps.winDelayMs=2500] - pause d'affichage après la victoire d'un match
+ * @param {number} [deps.drawDelayMs=1500] - pause d'affichage après un nul ou un point marqué
+ * @param {number} [deps.pointsToWin=10] - points nécessaires pour gagner un match
  */
 module.exports = function createTournamentModule({
     io,
     checkWinner,
     graceMs = 30000,
     winDelayMs = 2500,
-    drawDelayMs = 1500
+    drawDelayMs = 1500,
+    pointsToWin = POINTS_TO_WIN
 }) {
     // code -> tournoi
     const tournaments = {};
@@ -67,9 +72,14 @@ module.exports = function createTournamentModule({
     // Structure d'un match :
     // {
     //   id, round, index, p1, p2,        // p1/p2 = 'pub' des joueurs (ou null)
-    //   status: 'pending' | 'playing' | 'draw' | 'over' | 'done',
+    //   status: 'pending' | 'playing' | 'point' | 'draw' | 'over' | 'done',
+    //           ('point' = manche gagnée, le match continue ; 'draw' = manche nulle ;
+    //            'over' = match gagné, en attente d'avancer le vainqueur)
     //   bye, winner, board, turn,        // turn = 'X' | 'O'
-    //   sym: { X: pub, O: pub },         // qui joue quel symbole
+    //   sym: { X: pub, O: pub },         // qui joue quel symbole (s'inverse à chaque manche)
+    //   score1, score2,                  // points de p1 et de p2
+    //   manche,                          // numéro de la manche en cours
+    //   lastPoint,                       // 'pub' du joueur qui a marqué la dernière manche
     //   combo, replays, forfeit
     // }
     //
@@ -170,6 +180,7 @@ module.exports = function createTournamentModule({
             host: t.host,
             maxPlayers: MAX_PLAYERS,
             minPlayers: MIN_PLAYERS,
+            target: pointsToWin,
             champion: t.champion,
             roundNames: roundNames(t.rounds.length),
             players: t.players.map(p => ({
@@ -191,7 +202,11 @@ module.exports = function createTournamentModule({
                 sym: m.sym,
                 combo: m.combo,
                 replays: m.replays,
-                forfeit: m.forfeit
+                forfeit: m.forfeit,
+                s1: m.score1,
+                s2: m.score2,
+                manche: m.manche,
+                lastPoint: m.lastPoint
             })))
         };
     }
@@ -221,7 +236,11 @@ module.exports = function createTournamentModule({
             sym: null,
             combo: null,
             replays: 0,
-            forfeit: false
+            forfeit: false,
+            score1: 0,
+            score2: 0,
+            manche: 0,
+            lastPoint: null
         };
     }
 
@@ -295,7 +314,10 @@ module.exports = function createTournamentModule({
         m.sym = { X: m.p1, O: m.p2 };
         m.turn = 'X';
         m.board = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-        notice(t, `⚔️ ${nameOf(t, m.p1)} contre ${nameOf(t, m.p2)}`);
+        m.score1 = 0;
+        m.score2 = 0;
+        m.manche = 1;
+        notice(t, `⚔️ ${nameOf(t, m.p1)} contre ${nameOf(t, m.p2)} (premier à ${pointsToWin} points)`);
     }
 
     /** Match terminé (après la pause d'affichage) : on fait avancer le vainqueur. */
@@ -306,24 +328,27 @@ module.exports = function createTournamentModule({
         broadcast(t);
     }
 
-    /** Match nul : après une courte pause, on rejoue en inversant X et O. */
-    function replayMatch(t, m) {
-        if (!tournaments[t.code] || m.status !== 'draw') return;
+    /**
+     * Manche suivante (après un point marqué ou un nul) : plateau vidé et X/O inversés,
+     * ce qui fait commencer l'autre joueur.
+     */
+    function nextManche(t, m) {
+        if (!tournaments[t.code] || (m.status !== 'draw' && m.status !== 'point')) return;
         const { X, O } = m.sym;
         m.sym = { X: O, O: X };
         m.board = [0, 0, 0, 0, 0, 0, 0, 0, 0];
         m.turn = 'X';
         m.combo = null;
-        m.replays++;
+        m.lastPoint = null;
+        m.manche++;
         m.status = 'playing';
-        notice(t, `🔄 On rejoue : ${nameOf(t, m.sym.X)} commence`);
         broadcast(t);
     }
 
     /** Match en cours (ou en attente de rejeu) d'un joueur. */
     function activeMatchOf(t, pub) {
         return allMatches(t).find(m =>
-            (m.status === 'playing' || m.status === 'draw' || m.status === 'over') &&
+            (m.status === 'playing' || m.status === 'point' || m.status === 'draw' || m.status === 'over') &&
             (m.p1 === pub || m.p2 === pub)) || null;
     }
 
@@ -335,7 +360,8 @@ module.exports = function createTournamentModule({
         player.connected = false;
 
         const m = allMatches(t).find(x =>
-            (x.status === 'playing' || x.status === 'draw') && (x.p1 === pub || x.p2 === pub));
+            (x.status === 'playing' || x.status === 'point' || x.status === 'draw') &&
+            (x.p1 === pub || x.p2 === pub));
         if (m) {
             m.winner = m.p1 === pub ? m.p2 : m.p1;
             m.status = 'over';
@@ -532,16 +558,28 @@ module.exports = function createTournamentModule({
             if (!result) {
                 m.turn = mySymbol === 'X' ? 'O' : 'X';
             } else if (result.winner === 'draw') {
+                // Nul : aucun point, on rejoue la manche
                 m.status = 'draw';
                 m.combo = null;
-                notice(t, `🤝 Match nul entre ${nameOf(t, m.p1)} et ${nameOf(t, m.p2)} : on rejoue`);
-                setTimer(`${t.code}:${m.id}`, drawDelayMs, () => replayMatch(t, m));
+                m.replays++;
+                setTimer(`${t.code}:${m.id}`, drawDelayMs, () => nextManche(t, m));
             } else {
-                m.status = 'over';
-                m.winner = m.sym[result.winner];
+                // Manche gagnée : +1 point pour le vainqueur de la manche
+                const scorer = m.sym[result.winner];
+                if (scorer === m.p1) m.score1++; else m.score2++;
+                m.lastPoint = scorer;
                 m.combo = result.combo;
-                notice(t, `🏅 ${nameOf(t, m.winner)} gagne son match`);
-                setTimer(`${t.code}:${m.id}`, winDelayMs, () => completeMatch(t, m));
+
+                if (Math.max(m.score1, m.score2) >= pointsToWin) {
+                    // Objectif atteint : le match est gagné
+                    m.status = 'over';
+                    m.winner = scorer;
+                    notice(t, `🏅 ${nameOf(t, scorer)} gagne son match (${m.score1}-${m.score2})`);
+                    setTimer(`${t.code}:${m.id}`, winDelayMs, () => completeMatch(t, m));
+                } else {
+                    m.status = 'point';
+                    setTimer(`${t.code}:${m.id}`, drawDelayMs, () => nextManche(t, m));
+                }
             }
             broadcast(t);
         });

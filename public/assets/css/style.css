@@ -509,6 +509,7 @@ button:disabled {
 #tournament-link { color: var(--o); cursor: pointer; text-decoration: underline; }
 #tournament-link:hover { color: var(--jaune); }
 .tournament-count { margin-top: 10px; }
+#tournament-rules { margin-top: 10px; color: var(--jaune); }
 #tournament-players {
     display: flex;
     flex-wrap: wrap;
@@ -564,12 +565,16 @@ button:disabled {
     padding: 7px 6px;
     color: var(--texte);
     word-break: break-word;
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
 }
+.bracket-score { color: var(--jaune); }
 .bracket-player + .bracket-player { border-top: 2px solid var(--bord); }
 .bracket-player.winner { color: var(--vert); }
 .bracket-player.loser { color: var(--discret); text-decoration: line-through; }
 .bracket-player.me { background: #0b1f0b; }
-.bracket-player.tbd { color: var(--bord); text-align: center; }
+.bracket-player.tbd { color: var(--bord); justify-content: center; }
 .bracket-note {
     padding: 5px 6px;
     color: var(--discret);

@@ -42,7 +42,7 @@
                     <input type="text" id="tournament-code" placeholder="CODE" maxlength="5" autocomplete="off">
                     <button class="btn-primary" id="tournament-join-btn" onclick="joinTournament()">Rejoindre</button>
                 </div>
-                <p>Tournoi à élimination directe, de 2 à 8 joueurs</p>
+                <p>Tournoi à élimination directe, de 2 à 8 joueurs, matchs en 10 points</p>
             </div>
         </div>
 
@@ -84,6 +84,7 @@
                 </span>
                 <div class="tournament-count">👥 <span id="tournament-count">1/8</span> joueurs</div>
             </div>
+            <div id="tournament-rules"></div>
             <div id="tournament-players"></div>
             <button id="tournament-start-btn" class="btn-primary hide" onclick="startTournament()">▶️ Lancer le tournoi</button>
         </div>
