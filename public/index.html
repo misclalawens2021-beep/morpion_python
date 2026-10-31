@@ -33,6 +33,17 @@
                     <button class="btn-solo" id="solo-btn" onclick="startSoloGame()">🤖 Jouer contre l'ordinateur</button>
                 </div>
             </div>
+            <div class="solo-section tournament-home">
+                <span class="solo-separator">— ou —</span>
+                <div class="solo-controls">
+                    <button class="btn-warning" id="tournament-create-btn" onclick="createTournament()">🏆 Créer un tournoi</button>
+                </div>
+                <div class="solo-controls tournament-join">
+                    <input type="text" id="tournament-code" placeholder="CODE" maxlength="5" autocomplete="off">
+                    <button class="btn-primary" id="tournament-join-btn" onclick="joinTournament()">Rejoindre</button>
+                </div>
+                <p>Tournoi à élimination directe, de 2 à 8 joueurs</p>
+            </div>
         </div>
 
         <div id="status">Entrez votre pseudo et cliquez sur Commencer</div>
@@ -63,7 +74,23 @@
             </span>
         </div>
 
+        <div id="tournament-top" class="hide">
+            <div class="tournament-header">
+                <span class="label">🏆 Tournoi :</span>
+                <span id="tournament-code-label"></span>
+                <span id="tournament-invite">
+                    <span style="margin: 0 8px;">|</span>
+                    <span id="tournament-link" onclick="copyTournamentLink()">📋 Copier le lien</span>
+                </span>
+                <div class="tournament-count">👥 <span id="tournament-count">1/8</span> joueurs</div>
+            </div>
+            <div id="tournament-players"></div>
+            <button id="tournament-start-btn" class="btn-primary hide" onclick="startTournament()">▶️ Lancer le tournoi</button>
+        </div>
+
         <div id="board"></div>
+
+        <div id="tournament-bracket" class="hide"></div>
 
         <div class="controls">
             <button id="reset-btn" class="btn-warning hide" onclick="resetGame()">🔄 Nouvelle partie</button>

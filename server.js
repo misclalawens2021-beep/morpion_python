@@ -9,6 +9,7 @@
  * - Les mouvements et la logique du jeu
  * - Les salles (rooms) pour chaque partie
  * - Le nettoyage des parties inactives
+ * - Les tournois à élimination directe de 2 à 8 joueurs (tournament.js)
  * ================================================================
  */
 
@@ -20,6 +21,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const createTournamentModule = require('./tournament'); // mode tournoi (2 à 8 joueurs)
 
 const app = express();
 const server = http.createServer(app);
@@ -64,9 +66,12 @@ const games = {};
 
 /**
  * Vérifie s'il y a un gagnant ou un match nul.
- * Retourne un objet { winner, combo } ou null.
+ * Plateau : tableau de 9 cases (0 = vide, 1 = X, 2 = O).
+ * Retourne { winner: 'X' | 'O', combo } en cas de victoire,
+ * { winner: 'draw', combo: null } en cas de match nul, ou null si la manche continue.
  */
 function checkWinner(board) {
+    // Les 8 alignements gagnants : 3 lignes, 3 colonnes, 2 diagonales
     const wins = [
         [0,1,2], [3,4,5], [6,7,8],
         [0,3,6], [1,4,7], [2,5,8],
@@ -124,8 +129,14 @@ setInterval(cleanInactiveGames, 5 * 60 * 1000);
 // 4. LOGIQUE DES ÉVÉNEMENTS SOCKET.IO
 // ----------------------------------------------------------------
 
+// Mode tournoi : la logique est dans tournament.js (il réutilise checkWinner)
+const tournament = createTournamentModule({ io, checkWinner });
+
 io.on('connection', (socket) => {
     console.log(`🔌 Client connecté : ${socket.id}`);
+
+    // Branche les événements du tournoi (création, jointure, coups...) sur ce client
+    tournament.register(socket);
 
     // Envoyer un message de bienvenue
     socket.emit('connected', {
@@ -251,7 +262,7 @@ io.on('connection', (socket) => {
             console.log(`🎮 Nouvelle partie créée : ${activeRoomId} par ${socket.id}`);
         }
 
-        // Déterminer le symbole du joueur
+        // Déterminer le symbole du joueur : le premier arrivé est X, le second O
         let symbol = 'X';
         if (game.players['X']) {
             symbol = 'O';
@@ -384,7 +395,7 @@ io.on('connection', (socket) => {
             return;
         }
         
-        // Jouer le coup
+        // Jouer le coup (1 = X, 2 = O dans le tableau)
         game.board[position] = playerSymbol === 'X' ? 1 : 2;
         game.lastMove = Date.now();
         
@@ -393,15 +404,16 @@ io.on('connection', (socket) => {
         if (checkResult) {
             game.winner = checkResult.winner;
             game.winningCombo = checkResult.combo;
-            game.turn = null;
+            game.turn = null; // plus personne ne peut jouer jusqu'à la prochaine manche
             
-            // Mettre à jour le scoreboard
+            // Mettre à jour le scoreboard (victoire du joueur ou match nul)
             if (game.winner === 'draw') {
                 game.scores.draws++;
             } else {
                 game.scores[game.winner]++;
             }
         } else {
+            // La manche continue : on passe la main à l'autre joueur
             game.turn = game.turn === 'X' ? 'O' : 'X';
         }
         
@@ -537,6 +549,7 @@ io.on('connection', (socket) => {
 
     // ------------------------------------------------------------
     // ÉVÉNEMENT : Déconnexion
+    // (le joueur a 30 secondes pour revenir avant d'être retiré de la partie)
     // ------------------------------------------------------------
     socket.on('disconnect', () => {
         console.log(`🔌 Client déconnecté : ${socket.id}`);

@@ -40,76 +40,82 @@ body {
 }
 
 /* ==========================================================
-   DÉCOR DE FOND
-   1. ciel nocturne dégradé      (#bg-animated)
-   2. étoiles qui scintillent    (#bg-animated::before)
-   3. sol en grille néon         (#bg-animated::after)
-   4. envahisseurs en marche     (body::before)
+   DÉCOR DE FOND — coucher de soleil rétro
+   1. ciel dégradé + étoiles     (#bg-animated)
+   2. soleil à bandes            (#bg-animated::before)
+   3. montagnes en pixels        (#bg-animated::after)
+   4. X et O géants qui montent  (body::before)
    5. lignes de balayage + bords (body::after)
    ========================================================== */
 
-/* 1. Ciel : noir en haut, violet profond vers l'horizon */
+/* 1. Ciel : nuit violette en haut, horizon rouge et orange en bas, étoiles fixes */
 #bg-animated {
     position: fixed;
     inset: 0;
     z-index: 0;
     pointer-events: none;
     overflow: hidden;
-    background: linear-gradient(to bottom, #000000 0%, #0d0021 55%, #2a0845 82%, #5a0f5a 100%);
+    background:
+        radial-gradient(circle 2px at 8% 9%, #fff 90%, transparent),
+        radial-gradient(circle 2px at 19% 22%, #19e6ff 90%, transparent),
+        radial-gradient(circle 2px at 27% 6%, #fff 90%, transparent),
+        radial-gradient(circle 2px at 38% 17%, #fff 90%, transparent),
+        radial-gradient(circle 2px at 46% 8%, #ffe600 90%, transparent),
+        radial-gradient(circle 2px at 55% 26%, #fff 90%, transparent),
+        radial-gradient(circle 2px at 64% 12%, #fff 90%, transparent),
+        radial-gradient(circle 2px at 72% 5%, #19e6ff 90%, transparent),
+        radial-gradient(circle 2px at 81% 20%, #fff 90%, transparent),
+        radial-gradient(circle 2px at 90% 10%, #ffe600 90%, transparent),
+        radial-gradient(circle 2px at 95% 28%, #fff 90%, transparent),
+        radial-gradient(circle 2px at 13% 36%, #fff 90%, transparent),
+        radial-gradient(circle 2px at 58% 40%, #fff 90%, transparent),
+        linear-gradient(to bottom, #05001a 0%, #1b0640 38%, #6a0f6a 66%, #ff2e4d 88%, #ffb000 100%);
 }
 
-/* 2. Étoiles : un seul pixel de 3px dupliqué avec box-shadow */
+/* 2. Soleil : disque dégradé dont le bas est découpé en bandes de plus en plus larges */
 #bg-animated::before {
     content: "";
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 3px;
-    height: 3px;
-    background: transparent;
-    box-shadow:
-        4vw 6vh #fff,    11vw 22vh #19e6ff, 17vw 9vh #fff,    23vw 31vh #ffe600,
-        29vw 14vh #fff,  36vw 4vh #fff,     41vw 27vh #19e6ff, 47vw 12vh #fff,
-        53vw 35vh #fff,  58vw 7vh #ffe600,  63vw 19vh #fff,    69vw 3vh #19e6ff,
-        74vw 28vh #fff,  79vw 11vh #fff,    84vw 33vh #ffe600, 89vw 16vh #fff,
-        93vw 5vh #19e6ff, 97vw 24vh #fff,   7vw 38vh #fff,     14vw 44vh #19e6ff,
-        32vw 41vh #fff,  61vw 43vh #fff,    77vw 46vh #ffe600, 91vw 40vh #fff;
-    animation: scintille 3s steps(2, start) infinite alternate;
+    left: 84%;
+    bottom: 14vh;
+    width: min(44vmin, 380px);
+    height: min(44vmin, 380px);
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: linear-gradient(to bottom, #ffe600 0%, #ff9a1f 45%, #ff2e4d 80%, #c4005f 100%);
+    -webkit-mask-image: linear-gradient(to bottom,
+        #000 0 50%, transparent 50% 54%, #000 54% 62%, transparent 62% 68%,
+        #000 68% 78%, transparent 78% 86%, #000 86% 100%);
+    mask-image: linear-gradient(to bottom,
+        #000 0 50%, transparent 50% 54%, #000 54% 62%, transparent 62% 68%,
+        #000 68% 78%, transparent 78% 86%, #000 86% 100%);
 }
 
-/* 3. Sol : grille en perspective qui défile vers nous */
+/* 3. Montagnes : silhouette en escaliers (pixel art) avec un liseré cyan sur la crête */
 #bg-animated::after {
     content: "";
     position: absolute;
-    left: -50%;
-    right: -50%;
-    bottom: -8vh;
-    height: 52vh;
-    background:
-        repeating-linear-gradient(90deg, rgba(25, 230, 255, 0.55) 0 2px, transparent 2px 70px),
-        repeating-linear-gradient(0deg, rgba(255, 46, 77, 0.5) 0 2px, transparent 2px 56px);
-    transform: perspective(420px) rotateX(64deg);
-    transform-origin: center bottom;
-    -webkit-mask-image: linear-gradient(to top, #000 25%, transparent 100%);
-    mask-image: linear-gradient(to top, #000 25%, transparent 100%);
-    animation: defile 2.4s steps(8) infinite;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 22vh;
+    background-repeat: repeat-x;
+    background-size: 600px 100%;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 120' preserveAspectRatio='none' shape-rendering='crispEdges'><polygon fill='%23100030' points='0,120 0,84 36,84 36,60 72,60 72,36 108,36 108,12 144,12 144,36 180,36 180,60 216,60 216,84 252,84 252,60 288,60 288,36 336,36 336,60 372,60 372,84 408,84 408,60 444,60 444,24 480,24 480,48 516,48 516,72 552,72 552,84 600,84 600,120'/><polyline fill='none' stroke='%2319e6ff' stroke-width='3' points='0,84 36,84 36,60 72,60 72,36 108,36 108,12 144,12 144,36 180,36 180,60 216,60 216,84 252,84 252,60 288,60 288,36 336,36 336,60 372,60 372,84 408,84 408,60 444,60 444,24 480,24 480,48 516,48 516,72 552,72 552,84 600,84'/></svg>");
 }
 
-/* 4. Envahisseurs : deux colonnes dans les marges, elles descendent par paliers */
+/* 4. X et O géants en pixels : une tuile de 600 x 600 px qui monte lentement, par paliers */
 body::before {
     content: "";
     position: fixed;
     inset: 0;
     z-index: 1;
     pointer-events: none;
-    opacity: 0.22;
-    background-repeat: repeat-y, repeat-y;
-    background-size: 108px 90px, 108px 90px;
-    background-position: 3vw 0, calc(100% - 3vw) 0;
-    background-image:
-        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 15' shape-rendering='crispEdges'><g fill='%23ff2e4d'><rect x='2' y='0' width='1' height='1'/><rect x='8' y='0' width='1' height='1'/><rect x='3' y='1' width='1' height='1'/><rect x='7' y='1' width='1' height='1'/><rect x='2' y='2' width='7' height='1'/><rect x='1' y='3' width='2' height='1'/><rect x='4' y='3' width='3' height='1'/><rect x='8' y='3' width='2' height='1'/><rect x='0' y='4' width='11' height='1'/><rect x='0' y='5' width='1' height='1'/><rect x='2' y='5' width='7' height='1'/><rect x='10' y='5' width='1' height='1'/><rect x='0' y='6' width='1' height='1'/><rect x='2' y='6' width='1' height='1'/><rect x='8' y='6' width='1' height='1'/><rect x='10' y='6' width='1' height='1'/><rect x='3' y='7' width='2' height='1'/><rect x='6' y='7' width='2' height='1'/></g></svg>"),
-        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 15' shape-rendering='crispEdges'><g fill='%2319e6ff'><rect x='2' y='0' width='1' height='1'/><rect x='8' y='0' width='1' height='1'/><rect x='3' y='1' width='1' height='1'/><rect x='7' y='1' width='1' height='1'/><rect x='2' y='2' width='7' height='1'/><rect x='1' y='3' width='2' height='1'/><rect x='4' y='3' width='3' height='1'/><rect x='8' y='3' width='2' height='1'/><rect x='0' y='4' width='11' height='1'/><rect x='0' y='5' width='1' height='1'/><rect x='2' y='5' width='7' height='1'/><rect x='10' y='5' width='1' height='1'/><rect x='0' y='6' width='1' height='1'/><rect x='2' y='6' width='1' height='1'/><rect x='8' y='6' width='1' height='1'/><rect x='10' y='6' width='1' height='1'/><rect x='3' y='7' width='2' height='1'/><rect x='6' y='7' width='2' height='1'/></g></svg>");
-    animation: marche 12s steps(4) infinite;
+    opacity: 0.2;
+    background-repeat: repeat;
+    background-size: 600px 600px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 600' shape-rendering='crispEdges'><defs><path id='x' d='M0 0h1v1H0z M4 0h1v1H4z M1 1h1v1H1z M3 1h1v1H3z M2 2h1v1H2z M1 3h1v1H1z M3 3h1v1H3z M0 4h1v1H0z M4 4h1v1H4z'/><path id='o' d='M1 0h3v1H1z M0 1h1v3H0z M4 1h1v3H4z M1 4h3v1H1z'/></defs><use href='%23x' transform='translate(60 40) scale(12)' fill='%23ff2e4d'/><use href='%23o' transform='translate(330 110) scale(16)' fill='%2319e6ff'/><use href='%23x' transform='translate(500 290) scale(8)' fill='%23ffe600'/><use href='%23o' transform='translate(120 330) scale(10)' fill='%23ff2e4d'/><use href='%23x' transform='translate(300 430) scale(14)' fill='%2319e6ff'/><use href='%23o' transform='translate(520 520) scale(8)' fill='%23ffe600'/><use href='%23x' transform='translate(30 560) scale(8)' fill='%23ff2e4d'/></svg>");
+    animation: monte 40s steps(60) infinite;
 }
 
 /* 5. Écran cathodique : lignes de balayage et bords assombris, par-dessus tout */
@@ -130,17 +136,10 @@ body::after {
         radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.75) 100%);
 }
 
-@keyframes scintille {
-    to { opacity: 0.35; }
+@keyframes monte {
+    to { background-position: 0 -600px; }
 }
-@keyframes defile {
-    to { background-position: 0 0, 0 56px; }
-}
-@keyframes marche {
-    0%   { background-position: 3vw 0, calc(100% - 3vw) 0; }
-    50%  { background-position: calc(3vw + 24px) 45px, calc(100% - 3vw - 24px) 45px; }
-    100% { background-position: 3vw 90px, calc(100% - 3vw) 90px; }
-}
+
 
 .container {
     position: relative;
@@ -304,6 +303,9 @@ button:disabled {
     box-shadow: 0 0 24px rgba(25, 230, 255, 0.5);
 }
 
+/* Pas de cadre cyan tant que le plateau est vide (écran d'accueil) */
+#board:empty { display: none; }
+
 .cell {
     aspect-ratio: 1;
     background: var(--noir);
@@ -323,7 +325,7 @@ button:disabled {
     background: #14143a;
     box-shadow: inset 0 0 0 4px var(--jaune);
 }
-.cell.disabled { cursor: not-allowed; opacity: 0.6; }
+.cell.disabled { cursor: not-allowed; } /* pas d'opacité : elle laissait transparaître le cadre cyan */
 .cell.taken { cursor: default; }
 .cell.winner {
     background: #0b2a0b !important;
@@ -465,6 +467,114 @@ button:disabled {
     box-shadow: 0 0 12px rgba(255, 230, 0, 0.4);
 }
 .btn-solo { background: var(--o); color: var(--noir); }
+
+/* ---------- Mode tournoi ---------- */
+.tournament-join input {
+    font-family: inherit;
+    font-size: 0.8em;
+    width: 130px;
+    padding: 12px 10px;
+    text-align: center;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    background: var(--noir);
+    color: var(--jaune);
+    caret-color: var(--jaune);
+    border: 3px solid var(--bord);
+    border-radius: 0;
+}
+.tournament-join input::placeholder { color: var(--discret); letter-spacing: 1px; }
+.tournament-join input:focus {
+    outline: none;
+    border-color: var(--jaune);
+    box-shadow: 0 0 12px rgba(255, 230, 0, 0.4);
+}
+.tournament-home .solo-controls { margin-bottom: 12px; }
+
+#tournament-top {
+    background: var(--noir);
+    border: 3px solid var(--bord);
+    padding: 14px;
+    margin: 15px 0;
+    text-align: center;
+    font-size: 0.65em;
+    color: var(--discret);
+}
+#tournament-code-label {
+    color: var(--jaune);
+    font-size: 1.5em;
+    letter-spacing: 6px;
+    margin-left: 6px;
+}
+#tournament-link { color: var(--o); cursor: pointer; text-decoration: underline; }
+#tournament-link:hover { color: var(--jaune); }
+.tournament-count { margin-top: 10px; }
+#tournament-players {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin: 14px 0 4px;
+}
+.t-player {
+    border: 3px solid var(--bord);
+    padding: 6px 8px;
+    color: var(--texte);
+    background: var(--panneau);
+}
+.t-player.me { border-color: var(--vert); color: var(--vert); }
+.t-player.out { opacity: 0.45; text-decoration: line-through; }
+#tournament-start-btn { margin-top: 14px; }
+
+#tournament-bracket {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    margin-top: 22px;
+    padding: 16px 0 6px;
+    border-top: 3px dashed var(--bord);
+}
+.bracket-round {
+    flex: 1 0 140px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+/* Les cartes de match sont centrées dans la hauteur de la colonne, les titres restent alignés en haut */
+.bracket-matches {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    gap: 10px;
+}
+.bracket-round-title {
+    font-size: 0.55em;
+    color: var(--jaune);
+    text-align: center;
+}
+.bracket-match {
+    border: 3px solid var(--bord);
+    background: var(--noir);
+    font-size: 0.55em;
+}
+.bracket-match.live { border-color: var(--o); box-shadow: 0 0 10px rgba(25, 230, 255, 0.45); }
+.bracket-match.champion { border-color: var(--jaune); }
+.bracket-player {
+    padding: 7px 6px;
+    color: var(--texte);
+    word-break: break-word;
+}
+.bracket-player + .bracket-player { border-top: 2px solid var(--bord); }
+.bracket-player.winner { color: var(--vert); }
+.bracket-player.loser { color: var(--discret); text-decoration: line-through; }
+.bracket-player.me { background: #0b1f0b; }
+.bracket-player.tbd { color: var(--bord); text-align: center; }
+.bracket-note {
+    padding: 5px 6px;
+    color: var(--discret);
+    border-top: 2px dashed var(--bord);
+}
 
 /* ---------- Divers ---------- */
 .hide { display: none !important; }
